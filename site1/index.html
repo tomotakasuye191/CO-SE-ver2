@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>購買行動に関する実験 - 参加登録</title>
+<style>
+  :root{
+    --ink:#1c2b24;
+    --paper:#f6f4ee;
+    --line:#c9c2ae;
+    --accent:#2f5d4f;
+    --accent-soft:#e4ece7;
+    --error:#a3402f;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ min-height:100%; }
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Hiragino Sans","Yu Gothic",-apple-system,BlinkMacSystemFont,sans-serif;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    padding:24px;
+  }
+  .card{
+    width:100%;
+    max-width:460px;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:2px;
+    padding:40px 36px 32px;
+    position:relative;
+  }
+  .card::before{
+    content:"";
+    position:absolute;
+    top:0; left:0; right:0;
+    height:4px;
+    background:var(--accent);
+  }
+  .eyebrow{
+    font-size:12px;
+    letter-spacing:.14em;
+    color:var(--accent);
+    font-weight:600;
+    margin-bottom:10px;
+  }
+  h1{
+    font-size:22px;
+    line-height:1.5;
+    margin:0 0 14px;
+    font-weight:700;
+  }
+  p.desc{
+    font-size:14px;
+    line-height:1.8;
+    color:#4b554e;
+    margin:0 0 28px;
+  }
+  label{
+    display:block;
+    font-size:13px;
+    font-weight:600;
+    margin-bottom:8px;
+  }
+  input[type="text"]{
+    width:100%;
+    font-size:16px;
+    padding:13px 14px;
+    border:1px solid var(--line);
+    border-radius:2px;
+    background:var(--paper);
+    color:var(--ink);
+    outline:none;
+    transition:border-color .15s;
+  }
+  input[type="text"]:focus{
+    border-color:var(--accent);
+    background:#fff;
+  }
+  .hint{
+    font-size:12px;
+    color:#7a8279;
+    margin-top:8px;
+  }
+  .field{ margin-top:22px; }
+  .field label.q{
+    display:block;
+    font-size:13px;
+    font-weight:600;
+    margin-bottom:8px;
+  }
+  .radio-group{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .radio-pill{
+    padding:9px 16px;
+    border:1px solid var(--line);
+    border-radius:20px;
+    font-size:13px;
+    cursor:pointer;
+    background:var(--paper);
+    transition:background .12s, border-color .12s, color .12s;
+    user-select:none;
+  }
+  .radio-pill:hover{ border-color:var(--accent); }
+  .radio-pill.selected{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#fff;
+    font-weight:600;
+  }
+  input[type="number"]{
+    width:100%;
+    font-size:16px;
+    padding:13px 14px;
+    border:1px solid var(--line);
+    border-radius:2px;
+    background:var(--paper);
+    color:var(--ink);
+    outline:none;
+  }
+  input[type="number"]:focus{
+    border-color:var(--accent);
+    background:#fff;
+  }
+  .flow-steps{
+    margin:0 0 20px;
+    padding-left:22px;
+    font-size:14px;
+    line-height:1.9;
+    color:var(--ink);
+  }
+  .flow-steps li{ margin-bottom:6px; }
+  .notice-box{
+    background:#fbeae6;
+    border:1px solid #e6c3ba;
+    color:#7a3325;
+    font-size:13px;
+    line-height:1.8;
+    padding:14px 16px;
+    border-radius:2px;
+    margin-bottom:24px;
+  }
+  button{
+    width:100%;
+    margin-top:24px;
+    padding:14px;
+    font-size:15px;
+    font-weight:700;
+    letter-spacing:.02em;
+    border:none;
+    border-radius:2px;
+    background:var(--accent);
+    color:#fff;
+    cursor:pointer;
+    transition:opacity .15s;
+  }
+  button:disabled{
+    opacity:.55;
+    cursor:not-allowed;
+  }
+  .msg{
+    margin-top:16px;
+    font-size:13px;
+    line-height:1.7;
+    padding:12px 14px;
+    border-radius:2px;
+    display:none;
+  }
+  .msg.error{
+    display:block;
+    background:#fbeae6;
+    color:var(--error);
+    border:1px solid #e6c3ba;
+  }
+  .msg.loading{
+    display:block;
+    background:var(--accent-soft);
+    color:var(--accent);
+    border:1px solid #c7d9d0;
+  }
+  .footer-note{
+    margin-top:28px;
+    font-size:11px;
+    color:#9aa19a;
+    line-height:1.6;
+    border-top:1px solid var(--line);
+    padding-top:16px;
+  }
+</style>
+</head>
+<body>
+
+  <div class="card">
+    <div class="eyebrow">EXPERIMENT ENTRY / SITE 1</div>
+    <h1>購買行動に関する実験<br>参加登録</h1>
+    <p class="desc">
+      これから複数の画面に移動しながら、いくつかの商品についてお答えいただきます。<br>
+      まず、あなたについて教えてください。
+    </p>
+
+    <form id="entryForm">
+      <div class="field" style="margin-top:0;">
+        <label class="q">東京理科大学に所属していますか？</label>
+        <div class="radio-group" data-group="affiliation" id="affiliationGroup">
+          <div class="radio-pill" data-value="はい">はい</div>
+          <div class="radio-pill" data-value="いいえ">いいえ</div>
+        </div>
+      </div>
+
+      <div class="notice-box" id="rewardNotice" style="display:none;">
+        <b>ご注意</b><br>
+        この質問と次の入力欄は、<b>実験の報酬をお支払いするために必要な情報</b>としてお尋ねしています。それ以外の目的には使用しません。
+      </div>
+
+      <div class="field" id="field-studentId" style="display:none; margin-top:14px;">
+        <label class="q" for="studentId">学籍番号</label>
+        <input type="text" id="studentId" name="studentId" placeholder="例：24A1234B" autocomplete="off">
+        <div class="hint">半角英数字で入力してください。</div>
+      </div>
+
+      <div class="field" id="field-email" style="display:none; margin-top:14px;">
+        <label class="q" for="emailAddr">メールアドレス</label>
+        <input type="text" id="emailAddr" name="emailAddr" placeholder="例：example@rikadai.jp" autocomplete="off">
+        <div class="hint">報酬の受け取りに使用するメールアドレスをご入力ください。</div>
+      </div>
+
+      <div class="field">
+        <label class="q">性別</label>
+        <div class="radio-group" data-group="gender" id="genderGroup">
+          <div class="radio-pill" data-value="男性">男性</div>
+          <div class="radio-pill" data-value="女性">女性</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q" for="age">年齢</label>
+        <input type="number" id="age" min="10" max="100" placeholder="例：21">
+      </div>
+
+      <button type="submit" id="submitBtn">次へ</button>
+
+      <div class="msg" id="msgBox"></div>
+    </form>
+
+    <div class="footer-note">
+      本実験は卒業研究の一環として実施しています。回答は統計的に処理され、個人が特定される形で公開されることはありません。
+    </div>
+  </div>
+
+  <div class="card" id="flowCard" style="display:none;">
+    <div class="eyebrow">実験の流れ</div>
+    <h1>これから行っていただく実験について</h1>
+
+    <ol class="flow-steps">
+      <li><b>アンケート</b>：商品を選ぶ際に何を重視するかを判定する質問にお答えいただきます。</li>
+      <li><b>商品選択の実験</b>：2種類の商品について、実際に商品を選んでいただく実験を1セット4回、それを2財について行っていただきます。</li>
+      <li><b>最後に簡単なクイズ</b>：2種類の商品それぞれについて、知識を問う簡単なクイズにお答えいただきます。</li>
+    </ol>
+
+    <div class="notice-box">
+      <b>ご注意</b><br>
+      本実験で提示する商品は、実際に市場に出回っている商品を参考にしていますが、価格や成分などの数値は<b>必ずしも現実の値と一致するものではありません</b>。あらかじめご了承の上、ご回答ください。
+    </div>
+
+    <button type="button" id="flowNextBtn">実験を始める</button>
+  </div>
+
+<script>
+  // ▼ GASデプロイ後に発行される「ウェブアプリのURL」に差し替えてください
+  const GAS_URL = "https://script.google.com/macros/s/【ここにver2用の新しいデプロイIDを貼る】/exec";
+
+  // ▼ サイト2のURL（同一リポジトリ内のパスに合わせて調整してください）
+  // ▼ リポジトリの絶対URL（全ページ遷移をこれ基準にすることで相対パスの事故を防ぐ）
+  const BASE_URL = "https://tomotakasuye191.github.io/CO-SE-ver2/";
+
+  const form = document.getElementById('entryForm');
+  const submitBtn = document.getElementById('submitBtn');
+  const msgBox = document.getElementById('msgBox');
+  const idInput = document.getElementById('studentId');
+  const emailInput = document.getElementById('emailAddr');
+  const ageInput = document.getElementById('age');
+  const genderGroup = document.getElementById('genderGroup');
+  const affiliationGroup = document.getElementById('affiliationGroup');
+  const rewardNotice = document.getElementById('rewardNotice');
+  const fieldStudentId = document.getElementById('field-studentId');
+  const fieldEmail = document.getElementById('field-email');
+  let selectedGender = '';
+  let selectedAffiliation = '';
+
+  genderGroup.querySelectorAll('.radio-pill').forEach(function(pill){
+    pill.addEventListener('click', function(){
+      genderGroup.querySelectorAll('.radio-pill').forEach(function(p){ p.classList.remove('selected'); });
+      pill.classList.add('selected');
+      selectedGender = pill.dataset.value;
+    });
+  });
+
+  affiliationGroup.querySelectorAll('.radio-pill').forEach(function(pill){
+    pill.addEventListener('click', function(){
+      affiliationGroup.querySelectorAll('.radio-pill').forEach(function(p){ p.classList.remove('selected'); });
+      pill.classList.add('selected');
+      selectedAffiliation = pill.dataset.value;
+
+      rewardNotice.style.display = 'block';
+      if(selectedAffiliation === 'はい'){
+        fieldStudentId.style.display = 'block';
+        fieldEmail.style.display = 'none';
+        emailInput.value = '';
+      } else {
+        fieldEmail.style.display = 'block';
+        fieldStudentId.style.display = 'none';
+        idInput.value = '';
+      }
+    });
+  });
+
+  function showMessage(text, type){
+    msgBox.textContent = text;
+    msgBox.className = 'msg ' + type;
+  }
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+
+    if(!selectedAffiliation){
+      showMessage('東京理科大学への所属の有無を選択してください。', 'error');
+      return;
+    }
+
+    const idType = (selectedAffiliation === 'はい') ? 'studentId' : 'email';
+    const id = (idType === 'studentId') ? idInput.value.trim() : emailInput.value.trim();
+
+    if(!id){
+      showMessage(idType === 'studentId' ? '学籍番号を入力してください。' : 'メールアドレスを入力してください。', 'error');
+      return;
+    }
+    if(idType === 'email' && id.indexOf('@') === -1){
+      showMessage('正しいメールアドレスを入力してください。', 'error');
+      return;
+    }
+
+    const age = ageInput.value.trim();
+    if(!selectedGender){
+      showMessage('性別を選択してください。', 'error');
+      return;
+    }
+    if(!age){
+      showMessage('年齢を入力してください。', 'error');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    showMessage('登録しています…', 'loading');
+    registerId(id, selectedGender, age, selectedAffiliation, idType, false);
+  });
+
+  function registerId(id, gender, age, affiliation, idType, isAutoRetry){
+    fetch(GAS_URL, {
+      method: 'POST',
+      // text/plain にすることでプリフライトを回避し、GAS側のCORS制約を避ける
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'register', id: id, gender: gender, age: age, affiliation: affiliation, idType: idType })
+    }).then(function(res){ return res.json(); })
+      .then(function(data){
+        if(data.status !== 'ok'){
+          showMessage(data.message || '登録に失敗しました。時間をおいて再度お試しください。', 'error');
+          submitBtn.disabled = false;
+          return;
+        }
+
+        // 以降のサイトへIDや割り当て情報を引き継ぐ
+        sessionStorage.setItem('experiment_id', data.id);
+        sessionStorage.setItem('experiment_group', data.group);
+        sessionStorage.setItem('experiment_good1', data.good1);
+        sessionStorage.setItem('experiment_good2', data.good2);
+        sessionStorage.setItem('experiment_currentGoodIndex', '1');
+        sessionStorage.setItem('experiment_gender', data.gender || gender);
+        sessionStorage.setItem('experiment_age', data.age || age);
+
+        const query = new URLSearchParams({
+          id: data.id, group: data.group, good1: data.good1, good2: data.good2, current: '1',
+          gender: data.gender || gender, age: data.age || age
+        });
+        // 1財目（good1）を担当する、本番コンジョイントツールへのURL（「実験を始める」ボタンを押すまでは遷移しない）
+        const nextUrl = BASE_URL + 'site2/' + data.good1 + '.html?' + query.toString();
+
+        // 登録フォームを隠し、実験の流れ説明・注意事項の画面に切り替える
+        document.querySelector('.card:not(#flowCard)').style.display = 'none';
+        const flowCard = document.getElementById('flowCard');
+        flowCard.style.display = 'block';
+        document.getElementById('flowNextBtn').onclick = function(){
+          window.location.href = nextUrl;
+        };
+
+      }).catch(function(){
+        if(!isAutoRetry){
+          setTimeout(function(){ registerId(id, gender, age, affiliation, idType, true); }, 800);
+          return;
+        }
+        showMessage('通信エラーが発生しました。ネットワーク環境をご確認の上、再度お試しください。', 'error');
+        submitBtn.disabled = false;
+      });
+  }
+</script>
+
+</body>
+</html>

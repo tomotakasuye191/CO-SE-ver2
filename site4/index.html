@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>商品選択</title>
+<style>
+  :root{
+    --ink:#1c2b24;
+    --paper:#f6f4ee;
+    --line:#c9c2ae;
+    --accent:#2f5d4f;
+    --accent-soft:#e4ece7;
+    --error:#a3402f;
+    --base-badge:#b5842e;
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    min-height:100vh;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Hiragino Sans","Yu Gothic",-apple-system,BlinkMacSystemFont,sans-serif;
+    padding:12px 14px 24px;
+  }
+  .wrap{ max-width:1440px; margin:0 auto; }
+  .top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:3px;
+  }
+  .eyebrow{
+    font-size:10.5px;
+    letter-spacing:.12em;
+    color:var(--accent);
+    font-weight:700;
+  }
+  .progress{ font-size:10.5px; color:#7a8279; }
+  h1{
+    font-size:15px;
+    line-height:1.5;
+    margin:4px 0 4px;
+    font-weight:700;
+  }
+  p.desc{
+    font-size:11.5px;
+    line-height:1.6;
+    color:#4b554e;
+    margin:0 0 10px;
+  }
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(96px, 1fr));
+    gap:6px;
+  }
+  .slide-layout{
+    display:flex;
+    align-items:flex-start;
+    gap:14px;
+  }
+  .base-panel{
+    flex:0 0 148px;
+    position:sticky;
+    top:12px;
+  }
+  .base-panel .card{ cursor:pointer; }
+  .candidates-panel{
+    flex:1;
+    min-width:0;
+    max-height:calc(100vh - 130px);
+    overflow-y:auto;
+    padding-right:4px;
+  }
+  @media (max-width: 720px){
+    .slide-layout{ flex-direction:column; }
+    .base-panel{ position:static; width:100%; flex:none; }
+    .candidates-panel{ max-height:none; overflow-y:visible; width:100%; }
+  }
+  .card{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:5px;
+    cursor:pointer;
+    transition:border-color .12s, transform .08s;
+    display:flex;
+    flex-direction:column;
+  }
+  .card:hover{ border-color:var(--accent); transform:translateY(-1px); }
+  .card.base{
+    border:2px solid var(--base-badge);
+    background:#fdf7ec;
+  }
+  .badge{
+    display:inline-block;
+    font-size:8px;
+    font-weight:700;
+    color:#fff;
+    background:var(--base-badge);
+    padding:1px 5px;
+    border-radius:8px;
+    margin-bottom:4px;
+    align-self:flex-start;
+  }
+  .thumb{
+    width:100%;
+    aspect-ratio:1/1;
+    background:#fff;
+    border:1px solid #ece7db;
+    border-radius:2px;
+    overflow:hidden;
+    margin-bottom:3px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:3px;
+  }
+  .thumb img{ width:100%; height:100%; object-fit:contain; }
+  .thumb.noimg{
+    background:var(--accent-soft);
+    font-size:9px;
+    color:var(--accent);
+    font-weight:600;
+    text-align:center;
+    padding:4px;
+  }
+  .pname{
+    font-size:9px;
+    font-weight:700;
+    line-height:1.3;
+    margin-bottom:3px;
+    min-height:2.1em;
+  }
+  .attrs{ font-size:8.2px; color:#4b554e; line-height:1.4; }
+  .attrs div{ display:flex; justify-content:space-between; gap:3px; }
+  .attrs span.k{ color:#8a9189; flex:0 0 auto; }
+  .attrs span.v{ text-align:right; }
+
+  .intro-card .thumb{ cursor:pointer; }
+
+  .transition-screen{
+    max-width:560px;
+    margin:100px auto;
+    text-align:center;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:44px 36px;
+    position:relative;
+  }
+  .transition-screen::before{
+    content:"";
+    position:absolute;
+    top:0; left:0; right:0;
+    height:4px;
+    background:var(--accent);
+  }
+  .transition-screen h1{ font-size:19px; margin:0 0 16px; }
+  .transition-screen p{ font-size:14px; line-height:1.9; color:#4b554e; margin:0 0 26px; }
+  .transition-screen button{
+    padding:13px 32px;
+    font-size:14px;
+    font-weight:700;
+    border:none;
+    border-radius:2px;
+    background:var(--accent);
+    color:#fff;
+    cursor:pointer;
+  }
+
+  .loading-screen, .end-screen, .error-screen{
+    max-width:520px;
+    margin:80px auto;
+    text-align:center;
+  }
+  .spinner{
+    width:34px; height:34px;
+    margin:0 auto 22px;
+    border:3px solid var(--line);
+    border-top-color:var(--accent);
+    border-radius:50%;
+    animation:spin 0.9s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .error-box{
+    color:var(--error);
+    background:#fbeae6;
+    border:1px solid #e6c3ba;
+    padding:14px 16px;
+    border-radius:2px;
+    font-size:13px;
+    text-align:left;
+  }
+  button.retry{
+    margin-top:16px;
+    padding:10px 20px;
+    font-size:13px;
+    font-weight:700;
+    border:none;
+    border-radius:2px;
+    background:var(--accent);
+    color:#fff;
+    cursor:pointer;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap" id="app">
+    <div class="loading-screen">
+      <div class="spinner"></div>
+      <p>読み込んでいます…</p>
+    </div>
+  </div>
+
+<script src="../data/products.js"></script>
+<script src="../data/products_round2.js"></script>
+<script src="../data/round2_levels.js"></script>
+<script>
+(function(){
+
+  const GAS_URL = "https://script.google.com/macros/s/【ここにver2用の新しいデプロイIDを貼る】/exec";
+  const BASE_URL = "https://tomotakasuye191.github.io/CO-SE-ver2/";
+  const COMPLETE_URL = BASE_URL + "complete/index.html";
+
+  const GOOD_LABELS = { yogurt:'ヨーグルト', rice:'お米', wine:'ワイン', chocolate:'チョコレート' };
+
+  // 各財：画像を除く5属性のキーと表示ラベル（順番も表示順）
+  const FIELD_DEFS = {
+    yogurt: [['price','価格'],['volume','内容量'],['expiry','消費期限'],['nutrition','栄養情報'],['calorie','カロリー']],
+    rice: [['price','価格'],['origin','産地'],['volume','内容量'],['harvest','精米時期'],['polish','精米度合い']],
+    wine: [['price','価格'],['origin','ブドウ産地'],['abv','アルコール度数'],['color','色'],['taste','味わい']],
+    chocolate: [['price','価格'],['cacao_percent','カカオ量'],['effect','特定の効果の有無'],['calorie','カロリー'],['fairtrade','フェアトレード']]
+  };
+
+  const COMMON_COUNT = { 5:3, 10:5, 15:8, 20:10 };
+  const SIZES = [5, 10, 15, 20];
+
+  // ---- パラメータ取得 ----
+  const urlParams = new URLSearchParams(window.location.search);
+  function getParam(key){
+    return urlParams.get(key) || sessionStorage.getItem('experiment_' + key) || '';
+  }
+  const id = getParam('id');
+  const group = getParam('group');
+  const good1 = getParam('good1');
+  const good2 = getParam('good2');
+  const current = getParam('current') || '1';
+  const gender = getParam('gender');
+  const age = getParam('age');
+  const good = urlParams.get('good') || (current === '1' ? good1 : good2);
+  const item1 = urlParams.get('item1');
+  const item2 = urlParams.get('item2');
+  const hasImage = urlParams.get('hasImage') === '1';
+  const otherItem = urlParams.get('otherItem') || null;
+
+  // 重要視2項目（item1, item2）の水準別効用値。「次点に好ましい財」の計算に使う。
+  // 例："2,0,-1" のようなカンマ区切りの数値文字列で渡ってくる。
+  function parseUtils(raw){
+    if(!raw) return null;
+    return raw.split(',').map(Number);
+  }
+  const u1 = parseUtils(getParam('u1'));
+  const u2 = parseUtils(getParam('u2'));
+
+  sessionStorage.setItem('experiment_id', id);
+  sessionStorage.setItem('experiment_group', group);
+  sessionStorage.setItem('experiment_good1', good1);
+  sessionStorage.setItem('experiment_good2', good2);
+  sessionStorage.setItem('experiment_current', current);
+  sessionStorage.setItem('experiment_gender', gender);
+  sessionStorage.setItem('experiment_age', age);
+  if(urlParams.get('u1')) sessionStorage.setItem('experiment_u1', urlParams.get('u1'));
+  if(urlParams.get('u2')) sessionStorage.setItem('experiment_u2', urlParams.get('u2'));
+
+  const app = document.getElementById('app');
+
+  // GASのコールドスタート対策：ページを開いた時点で軽く一度呼んでおく（結果は使わない）
+  try{
+    fetch(GAS_URL, { method: 'GET', mode: 'no-cors' }).catch(function(){});
+  }catch(e){}
+
+  function fail(msg, retryFn){
+    const retryHtml = retryFn
+      ? '<button class="retry" id="retryActionBtn">再送信する</button>'
+      : '<button class="retry" onclick="location.reload()">再読み込み</button>';
+    app.innerHTML =
+      '<div class="error-screen"><div class="error-box">' + msg + '</div>' +
+      retryHtml + '</div>';
+    if(retryFn){
+      document.getElementById('retryActionBtn').addEventListener('click', retryFn);
+    }
+  }
+
+  if(!id || !good || !window.PRODUCTS || !window.PRODUCTS[good]){
+    fail('必要な情報が読み込めませんでした。最初のページからやり直してください。');
+    return;
+  }
+
+  if(!window.PRODUCTS_ROUND2 || !window.PRODUCTS_ROUND2[good]){
+    fail('2回目の実験用データ（products_round2.js）が読み込めませんでした。<br>' +
+         'サーバーに data/products_round2.js が正しくアップロードされているか確認してください。');
+    return;
+  }
+
+  if(!window.Round2Levels){
+    fail('2回目の実験用データ（round2_levels.js）が読み込めませんでした。<br>' +
+         'サーバーに data/round2_levels.js が正しくアップロードされているか確認してください。');
+    return;
+  }
+
+  if(!u1 || !u2){
+    fail('必要な情報（重要視項目の効用値）が読み込めませんでした。最初のページからやり直してください。');
+    return;
+  }
+
+  const products = window.PRODUCTS[good].slice(); // 21商品+追加財
+  const fieldDefs = FIELD_DEFS[good];
+  const goodLabel = GOOD_LABELS[good];
+
+  // ---- ユーティリティ ----
+  function shuffle(arr){
+    const a = arr.slice();
+    for(let i = a.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+  function sampleN(arr, n){ return shuffle(arr).slice(0, n); }
+
+  function attrValue(product, key){ return product.attrs[key]; }
+  function formatValue(key, val){
+    if(key === 'price') return '¥' + Number(val).toLocaleString();
+    if(key === 'abv') return val + '%';
+    return val;
+  }
+
+  // ---- 状態 ----
+  let baseItem = null;          // 最初(intro)で選んだ財
+  let introPool = [];           // イントロで表示した10財（この10財はCO1回目の候補には出さない）
+  let round1Pool = [];          // CO1回目で候補を出す母集団（全財からintroPoolを除いたもの）
+  let remainingSizes = [];      // ラウンド1の残りサイズ
+  let round1Records = [];       // {size, presentedIds, kept, chosenId, chosenName}
+  let remainingSizes2 = [];     // ラウンド2の残りサイズ
+  let round2Records = [];       // {size, presentedIds, commonIds, overrideFields, kept, chosenId, chosenName}
+  let phase = 'intro';          // 'intro' | 'round1' | 'round2'
+
+  const INTRO_SAMPLE_SIZE = 10;
+  const TOTAL_STEPS = 1 + SIZES.length * 2; // イントロ1 + ラウンド1(4) + ラウンド2(4) = 9
+
+  // ============================================================
+  // フェーズ0：全商品からランダムに10財を抽出し、その中から基準財を選ぶ
+  // ============================================================
+  function renderIntro(){
+    introPool = sampleN(products, Math.min(INTRO_SAMPLE_SIZE, products.length));
+    const order = shuffle(introPool);
+    let html = '';
+    html += '<div class="top"><span class="eyebrow">SITE 4 / ' + goodLabel + '</span>' +
+            '<span class="progress">STEP 1 / ' + TOTAL_STEPS + '</span></div>';
+    html += '<h1>' + goodLabel + 'の中で、いちばん好きなもの・身近なものを1つ選んでください</h1>';
+    html += '<p class="desc">下の' + order.length + '個の中からクリックして選んでください。この後の画面で、この商品を基準に選択が続きます。</p>';
+    html += '<div class="grid" id="introGrid"></div>';
+    app.innerHTML = html;
+
+    const grid = document.getElementById('introGrid');
+    order.forEach(function(p){
+      const card = buildCard(p, { isBase:false, hideImage:false, overrides:null });
+      card.addEventListener('click', function(){
+        baseItem = p;
+        // CO1回目の候補母集団：イントロで見せた10財を除いた残り全部
+        const introIds = new Set(introPool.map(function(ip){ return ip.id; }));
+        round1Pool = products.filter(function(pr){ return !introIds.has(pr.id); });
+        phase = 'round1';
+        remainingSizes = shuffle(SIZES);
+        nextRound1Slide();
+      });
+      grid.appendChild(card);
+    });
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  function currentStepNo(){
+    if(phase === 'round1'){
+      return 1 + (SIZES.length - remainingSizes.length); // 2〜5
+    }
+    if(phase === 'round2'){
+      return 1 + SIZES.length + (SIZES.length - remainingSizes2.length); // 6〜9
+    }
+    return 1;
+  }
+
+  // ============================================================
+  // ラウンド1：操作なしCO測定（画像・全属性とも実データそのまま）
+  // ============================================================
+  function nextRound1Slide(){
+    if(remainingSizes.length === 0){
+      phase = 'round2';
+      remainingSizes2 = shuffle(SIZES);
+      renderRoundTransition();
+      return;
+    }
+    const size = remainingSizes.shift();
+    renderRound1Slide(size);
+  }
+
+  // ============================================================
+  // ラウンド間の区切り画面
+  // ============================================================
+  function renderRoundTransition(){
+    app.innerHTML =
+      '<div class="transition-screen">' +
+        '<h1>ここまでで1回目の実験が終わりました</h1>' +
+        '<p>' +
+          'ここからは条件を変えて、2回目の実験に入ります。<br>' +
+          '先ほどと同じように、' + goodLabel + 'を比較して選んでいただきます。' +
+        '</p>' +
+        '<button id="toRound2Btn">2回目の実験を始める</button>' +
+      '</div>';
+    document.getElementById('toRound2Btn').addEventListener('click', function(){
+      nextRound2Slide();
+    });
+  }
+
+  function renderRound1Slide(size){
+    const pool = round1Pool;
+    const presented = sampleN(pool, size);
+
+    let html = '';
+    html += '<div class="top"><span class="eyebrow">SITE 4 / ' + goodLabel + '（1回目）</span>' +
+            '<span class="progress">STEP ' + currentStepNo() + ' / ' + TOTAL_STEPS + '（候補' + size + '個）</span></div>';
+    html += '<h1>今回選ぶなら、どちらにしますか？</h1>';
+    html += '<p class="desc">左側は最初に選んだ商品です。右側をスクロールして他の候補と見比べ、気になったものをクリックしてください。左側をクリックすればそのまま選び続けられます。</p>';
+    html += '<div class="slide-layout">' +
+            '<div class="base-panel" id="basePanel"></div>' +
+            '<div class="candidates-panel"><div class="grid" id="slideGrid"></div></div>' +
+            '</div>';
+    app.innerHTML = html;
+
+    const basePanel = document.getElementById('basePanel');
+    const grid = document.getElementById('slideGrid');
+
+    // 基準財カード（左固定、実データのまま）
+    basePanel.appendChild(buildCard(baseItem, { isBase:true, hideImage:false, overrides:null }));
+
+    // 候補カード（すべて実データのまま、操作なし）
+    presented.forEach(function(p){
+      grid.appendChild(buildCard(p, { isBase:false, hideImage:false, overrides:null }));
+    });
+
+    const clickable = Array.from(basePanel.children).concat(Array.from(grid.children));
+    clickable.forEach(function(cardEl){
+      cardEl.addEventListener('click', function(){
+        const clickedId = Number(cardEl.dataset.id);
+        const kept = (clickedId === baseItem.id);
+        const chosen = products.find(function(p){ return p.id === clickedId; });
+
+        round1Records.push({
+          size: size,
+          presentedIds: presented.map(function(p){ return p.id; }),
+          kept: kept,
+          chosenId: clickedId,
+          chosenName: chosen ? chosen.name : baseItem.name
+        });
+
+        nextRound1Slide();
+      });
+    });
+  }
+
+  // ============================================================
+  // ラウンド2：操作あり CO・SE測定
+  // 基準財(base)は常にintroで選んだ財のまま。似せる基準（アンカー）は、
+  // ラウンド1の結果とは無関係に、コンジョイント結果から求めた
+  // 「次点に好ましい財」（提示候補の中で最もスコアが高い財）を使う。
+  // ============================================================
+  function nextRound2Slide(){
+    if(remainingSizes2.length === 0){
+      submitResults();
+      return;
+    }
+    const size = remainingSizes2.shift();
+    renderRound2Slide(size);
+  }
+
+  // 提示候補1件のスコア（重要視2項目の水準別効用値の合計）を計算する。
+  // 対応する水準が無い属性は寄与0として扱う。
+  function candidateScore(p){
+    return window.Round2Levels.utilFor(good, p, item1, u1) +
+           window.Round2Levels.utilFor(good, p, item2, u2);
+  }
+
+  function renderRound2Slide(size){
+    // 基準財(base)は常に左固定・無操作。候補は「2回目CO用の新20商品」から出す。
+    // ラウンド1の結果は使わない：この被験者のコンジョイント結果（重要視2項目の
+    // 水準別効用値）から見て、提示候補の中で最もスコアが高い財＝「合理的なら必ず
+    // 選ぶはずの財」を求め、これを「次点に好ましい財」としてアンカー（似せる基準）にする。
+    const pool2 = window.PRODUCTS_ROUND2[good].slice();
+    const presented = sampleN(pool2, size);
+
+    let bestScore = -Infinity, bestCandidates = [];
+    presented.forEach(function(p){
+      const s = candidateScore(p);
+      if(s > bestScore){ bestScore = s; bestCandidates = [p]; }
+      else if(s === bestScore){ bestCandidates.push(p); }
+    });
+    // 同点の場合はランダムに1つを選ぶ
+    const anchor = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
+    const sourceItem = anchor;
+
+    const commonCount = COMMON_COUNT[size];
+    const restForCommon = presented.filter(function(p){ return p.id !== anchor.id; });
+    const commonSet = new Set([anchor.id].concat(sampleN(restForCommon, commonCount - 1).map(function(p){ return p.id; })));
+
+    const overrideFields = hasImage ? [otherItem] : [item1, item2];
+
+    let html = '';
+    html += '<div class="top"><span class="eyebrow">SITE 4 / ' + goodLabel + '（2回目）</span>' +
+            '<span class="progress">STEP ' + currentStepNo() + ' / ' + TOTAL_STEPS + '（候補' + size + '個）</span></div>';
+    html += '<h1>今回選ぶなら、どちらにしますか？</h1>';
+    html += '<p class="desc">左側は最初に選んだ商品です。右側をスクロールして他の候補と見比べ、気になったものをクリックしてください。</p>';
+    html += '<div class="slide-layout">' +
+            '<div class="base-panel" id="basePanel"></div>' +
+            '<div class="candidates-panel"><div class="grid" id="slideGrid"></div></div>' +
+            '</div>';
+    app.innerHTML = html;
+
+    const basePanel = document.getElementById('basePanel');
+    const grid = document.getElementById('slideGrid');
+
+    // 基準財（常にbaseItem。実データのまま）
+    basePanel.appendChild(buildCard(baseItem, { isBase:true, hideImage:false, overrides:null }));
+
+    presented.forEach(function(p){
+      const isCommon = commonSet.has(p.id);
+      const isSourceItself = (p.id === anchor.id);
+      let hideImage = false;
+      let overrides = null;
+
+      if(hasImage){
+        hideImage = !isCommon; // アンカー(または似せた財)のみ画像表示
+        if(isCommon && !isSourceItself && otherItem){
+          overrides = {};
+          overrides[otherItem] = attrValue(sourceItem, otherItem);
+        }
+      } else {
+        if(isCommon && !isSourceItself){
+          overrides = {};
+          overrides[item1] = attrValue(sourceItem, item1);
+          overrides[item2] = attrValue(sourceItem, item2);
+        }
+      }
+
+      grid.appendChild(buildCard(p, { isBase:false, hideImage:hideImage, overrides:overrides }));
+    });
+
+    const clickable = Array.from(basePanel.children).concat(Array.from(grid.children));
+    clickable.forEach(function(cardEl){
+      cardEl.addEventListener('click', function(){
+        const clickedIdRaw = cardEl.dataset.id; // 文字列（基準財は数値ID、新候補は"b1"等）
+        const kept = (clickedIdRaw === String(baseItem.id));
+        let chosenName;
+        if(kept){
+          chosenName = baseItem.name;
+        } else {
+          const chosen = presented.find(function(p){ return String(p.id) === clickedIdRaw; });
+          chosenName = chosen ? chosen.name : '';
+        }
+
+        round2Records.push({
+          size: size,
+          anchorId: anchor.id,
+          anchorName: anchor.name,
+          anchorScore: bestScore,
+          presentedIds: presented.map(function(p){ return p.id; }),
+          commonIds: Array.from(commonSet),
+          overrideFields: overrideFields,
+          kept: kept,
+          chosenId: clickedIdRaw,
+          chosenName: chosenName
+        });
+
+        nextRound2Slide();
+      });
+    });
+  }
+
+  function buildCard(product, opts){
+    const el = document.createElement('div');
+    el.className = 'card' + (opts.isBase ? ' base' : '');
+    el.dataset.id = product.id;
+
+    let inner = '';
+    if(opts.isBase){
+      inner += '<span class="badge">今回の基準の商品</span>';
+    }
+
+    if(opts.hideImage){
+      inner += '<div class="thumb noimg">' + escapeHtml(product.name) + '</div>';
+    } else {
+      inner += '<div class="thumb"><img src="../images/' + product.image + '" alt="' + escapeHtml(product.name) + '"></div>';
+      inner += '<div class="pname">' + escapeHtml(product.name) + '</div>';
+    }
+
+    inner += '<div class="attrs">';
+    fieldDefs.forEach(function(pair){
+      const key = pair[0], label = pair[1];
+      let val = attrValue(product, key);
+      if(opts.overrides && Object.prototype.hasOwnProperty.call(opts.overrides, key)){
+        val = opts.overrides[key];
+      }
+      inner += '<div><span class="k">' + label + '</span><span class="v">' + escapeHtml(formatValue(key, val)) + '</span></div>';
+    });
+    inner += '</div>';
+
+    el.innerHTML = inner;
+    return el;
+  }
+
+  // ============================================================
+  // 送信 & 次のステップへ
+  // ============================================================
+  function submitResults(){
+    const round1Payload = {
+      slideOrder: round1Records.map(function(r){ return r.size; }),
+      results: {}
+    };
+    round1Records.forEach(function(r){
+      round1Payload.results[r.size] = { kept: r.kept, chosenId: r.chosenId, chosenName: r.chosenName };
+    });
+
+    const round2Payload = {
+      slideOrder: round2Records.map(function(r){ return r.size; }),
+      results: {},
+      commonality: {}
+    };
+    round2Records.forEach(function(r){
+      round2Payload.results[r.size] = { kept: r.kept, chosenId: r.chosenId, chosenName: r.chosenName };
+      round2Payload.commonality[r.size] = {
+        anchorId: r.anchorId,
+        anchorName: r.anchorName,
+        anchorScore: r.anchorScore,
+        commonCount: r.commonIds.length,
+        commonIds: r.commonIds,
+        presentedIds: r.presentedIds,
+        overrideFields: r.overrideFields
+      };
+    });
+
+    const payload = {
+      action: 'submitCO',
+      id: id, good: good,
+      baseId: baseItem.id, baseName: baseItem.name,
+      round1: round1Payload,
+      round2: round2Payload
+    };
+
+    // 送信前に保存しておく → 通信に失敗して再読み込みしても、この回答から再送信できる
+    sessionStorage.setItem('experiment_pendingCO_' + good, JSON.stringify(payload));
+
+    sendCOPayload(payload);
+  }
+
+  function sendCOPayload(payload, isAutoRetry){
+    app.innerHTML =
+      '<div class="loading-screen"><div class="spinner"></div><p>結果を記録しています…</p></div>';
+
+    fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    }).then(function(res){
+        return res.text().then(function(text){
+          let parsed;
+          try{
+            parsed = JSON.parse(text);
+          }catch(e){
+            throw new Error('サーバーから予期しない応答（HTTP ' + res.status + '）: ' + text.slice(0, 200));
+          }
+          return parsed;
+        });
+      })
+      .then(function(data){
+        if(data.status !== 'ok'){
+          fail((data.message || '記録に失敗しました。') + '（回答データは保存されているので、再送信できます）',
+               function(){ sendCOPayload(payload); });
+          return;
+        }
+        sessionStorage.removeItem('experiment_pendingCO_' + good);
+        goToNext();
+      }).catch(function(err){
+        if(!isAutoRetry){
+          // 1回だけ自動で再試行してから、ユーザーにエラーを見せる
+          setTimeout(function(){ sendCOPayload(payload, true); }, 800);
+          return;
+        }
+        fail('通信エラーが発生しました：' + err.message + '<br>回答データは保存されているので、再送信できます。',
+             function(){ sendCOPayload(payload); });
+      });
+  }
+
+  function goToNext(){
+    if(current === '1'){
+      // 1財目のCOが終わった → 実験中は知識アンケードを挟まず、そのまま2財目のコンジョイントへ
+      const query = new URLSearchParams({ id:id, group:group, good1:good1, good2:good2, current:'2', gender:gender, age:age });
+      window.location.href = BASE_URL + 'site2/' + good2 + '.html?' + query.toString();
+    } else {
+      // 2財目のCOも終わった → ここで初めて、2財分の知識アンケードをまとめて実施する（財1から開始）
+      const query = new URLSearchParams({ id:id, group:group, good1:good1, good2:good2, gender:gender, age:age, qseq:'1' });
+      window.location.href = BASE_URL + 'site5/' + good1 + '.html?' + query.toString();
+    }
+  }
+
+  // ---- 開始 ----
+  // 直前のセッションで送信に失敗した回答が残っていれば、まずそれを再送信する
+  const pendingRaw = sessionStorage.getItem('experiment_pendingCO_' + good);
+  if(pendingRaw){
+    try{
+      const pendingPayload = JSON.parse(pendingRaw);
+      app.innerHTML = '<div class="loading-screen"><div class="spinner"></div>' +
+        '<p>前回未送信だった回答が見つかりました。送信しています…</p></div>';
+      sendCOPayload(pendingPayload);
+    }catch(e){
+      sessionStorage.removeItem('experiment_pendingCO_' + good);
+      renderIntro();
+    }
+  } else {
+    renderIntro();
+  }
+
+})();
+</script>
+</body>
+</html>

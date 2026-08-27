@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>チョコレートに関するアンケート調査</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6f5f0;
+    --surface: #ffffff;
+    --ink: #26242f;
+    --ink-soft: #6b6875;
+    --accent: #6e5ec4;
+    --accent-dark: #574aa0;
+    --accent-soft: #ece8f9;
+    --mint: #3fa796;
+    --mint-soft: #e2f4f1;
+    --border: #e3e1da;
+    --danger: #c85c5c;
+    --radius: 18px;
+    --font-display: 'Zen Maru Gothic', 'Noto Sans JP', sans-serif;
+    --font-body: 'Noto Sans JP', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+    min-height: 100vh;
+  }
+
+  .card {
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  #screen-conjoint .card {
+    max-width: 900px;
+  }
+
+  header.top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .yogurt-mark {
+    width: 34px; height: 34px;
+    border-radius: 10px;
+    background: linear-gradient(160deg, var(--accent), var(--mint));
+    flex-shrink: 0;
+  }
+
+  header.top .title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--ink-soft);
+    letter-spacing: .02em;
+  }
+
+  .screen { display: none; animation: fadein .35s ease; }
+  .screen.active { display: block; }
+
+  @keyframes fadein {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    box-shadow: 0 1px 2px rgba(38,36,47,0.03);
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 900;
+    margin: 0 0 14px;
+    line-height: 1.4;
+  }
+
+  h2 {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 12px;
+  }
+
+  p { margin: 0 0 14px; color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 14px; }
+
+  .field { margin-bottom: 20px; }
+  .field label.q {
+    display: block;
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+
+  .radio-group, .select-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .radio-pill {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 999px;
+    padding: 9px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    user-select: none;
+    transition: all .15s ease;
+  }
+  .radio-pill:hover { border-color: var(--accent); }
+  .radio-pill.selected {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 700;
+  }
+
+  select, input[type="text"], input[type="number"] {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 15px;
+    font-family: var(--font-body);
+    background: #fff;
+    color: var(--ink);
+  }
+  select:focus, input:focus, .radio-pill:focus-visible, button:focus-visible {
+    outline: 3px solid var(--accent-soft);
+    outline-offset: 1px;
+    border-color: var(--accent);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 14px 22px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: var(--font-body);
+    cursor: pointer;
+    width: 100%;
+    transition: background .15s ease, transform .1s ease;
+  }
+  .btn:hover { background: var(--accent-dark); }
+  .btn:active { transform: scale(.99); }
+  .btn:disabled { background: #c9c6d6; cursor: not-allowed; }
+  .btn.secondary {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  .btn.secondary:hover { background: var(--accent-soft); }
+
+  .consent-box {
+    background: var(--accent-soft);
+    border-radius: 12px;
+    padding: 16px 18px;
+    font-size: 13.5px;
+    color: var(--ink);
+    margin-bottom: 20px;
+  }
+  .consent-box ul { margin: 6px 0 0; padding-left: 18px; }
+  .consent-box li { margin-bottom: 4px; }
+
+  /* progress dots */
+  .progress-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 22px;
+  }
+  .progress-dot {
+    flex: 1;
+    height: 6px;
+    border-radius: 4px;
+    background: var(--border);
+    transition: background .25s ease;
+  }
+  .progress-dot.done { background: var(--mint); }
+  .progress-dot.current { background: var(--accent); }
+  .progress-label {
+    font-size: 13px;
+    color: var(--ink-soft);
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+
+  .versus {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-soft);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 13px;
+    margin: 4px 0;
+  }
+
+  .options-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+  @media (min-width: 680px) {
+    .options-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      align-items: stretch;
+    }
+  }
+
+  .option-card {
+    border: 2px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 18px 16px;
+    cursor: pointer;
+    transition: all .15s ease;
+    background: #fff;
+  }
+  .option-card:hover { border-color: var(--accent); }
+  .option-card.selected {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .option-card .opt-label {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .nutrition-image-box {
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 4px 0 10px;
+    overflow: hidden;
+    border-radius: 12px;
+  }
+  .nutrition-image-box img {
+    height: 120px;
+    width: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: 12px;
+  }
+  .nutrition-image-empty {
+    /* 「画像なし」でも高さを揃え、カードの見た目の差が結果に影響しないようにする */
+    visibility: hidden;
+  }
+  .attr-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14.5px;
+    padding: 5px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .attr-row:last-child { border-bottom: none; }
+  .attr-row .k { color: var(--ink-soft); }
+  .attr-row .v { font-weight: 700; }
+
+  .set-question {
+    text-align: center;
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 16px;
+  }
+
+  .spinner {
+    width: 34px; height: 34px;
+    border: 4px solid var(--accent-soft);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    margin: 20px auto;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .result-type {
+    font-family: var(--font-display);
+    font-size: 26px;
+    font-weight: 900;
+    color: var(--accent-dark);
+    text-align: center;
+    margin: 6px 0 18px;
+  }
+  .result-badges { display: flex; gap: 8px; justify-content: center; margin-bottom: 18px; flex-wrap: wrap; }
+  .badge {
+    background: var(--mint-soft);
+    color: #1f6e61;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .error-box {
+    background: #fbeaea;
+    color: var(--danger);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+
+  footer.note {
+    text-align: center;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-top: 24px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div class="yogurt-mark"></div>
+    <div class="title">チョコレートに関する意識調査</div>
+  </header>
+
+  <!-- ============ 画面1: 同意 ============ -->
+  <section id="screen-intro" class="screen active">
+    <div class="card">
+      <h1>チョコレートの選び方についての調査</h1>
+      <p>この調査は、卒業論文の研究の一環として実施しています。チョコレートを選ぶ際にどのような点を重視するかを、簡単な質問形式でお伺いします。所要時間は約3〜5分です。</p>
+      <div class="consent-box">
+        <strong>ご回答にあたって</strong>
+        <ul>
+          <li>回答は研究目的にのみ使用し、個人が特定される形で公開することはありません。</li>
+          <li>回答は途中でやめることもできます。その場合、送信されたデータは無効データとして扱われます。</li>
+          <li>学籍番号は集計・分析上の識別のためにのみ使用し、成績等には一切関係しません。</li>
+        </ul>
+      </div>
+      <button class="btn" id="btn-start">同意して回答をはじめる</button>
+    </div>
+  </section>
+
+  <!-- ============ 画面3: コンジョイント9セット ============ -->
+  <section id="screen-conjoint" class="screen">
+    <div class="progress-label" id="progress-label">セット 1 / 17</div>
+    <div class="progress-wrap" id="progress-wrap"></div>
+    <div class="card">
+      <div class="set-question">どのチョコレートを選びますか？</div>
+      <div class="options-grid">
+        <div class="option-card" id="option-A" data-choice="0"></div>
+        <div class="option-card" id="option-B" data-choice="1"></div>
+        <div class="option-card" id="option-C" data-choice="2"></div>
+      </div>
+      <button class="btn" id="btn-next-set" disabled style="margin-top:6px;">次へ</button>
+    </div>
+  </section>
+
+  <!-- ============ 画面6: 結果 ============ -->
+  <section id="screen-result" class="screen">
+    <div class="card">
+      <h2 style="text-align:center;">ご回答ありがとうございました</h2>
+      <p class="muted" id="submit-status" style="text-align:center;">回答を記録しています…</p>
+      <button class="btn secondary" id="btn-retry-submit" style="display:none;">回答をもう一度記録する</button>
+    </div>
+    <footer class="note">回答データは研究目的にのみ使用されます。</footer>
+  </section>
+
+</div>
+
+<script>
+/* =========================================================================
+   1. コンジョイント設計データ（51プロファイル・17選択セット×3択）
+   価格・カカオ量・特定の効果の有無・カロリー（各3水準）＋フェアトレード（2水準）の
+   5属性による混合水準の直交計画。方向性が明確な属性が価格のみのため、
+   アテンションチェックは設けず、17セットすべてを推定データとして使用する。
+   ※ このデータ自体は毎回固定（全員共通の質問セット）です。
+   ========================================================================= */
+
+// 属性の並び順（内部キー）。以降のデータ配列はすべてこの順で並んでいる。
+const ATTRS = ['price', 'cacao', 'effect', 'cal', 'fairtrade'];
+
+// 各属性の水準数（価格・カカオ量・効果・カロリーは3水準、フェアトレードは2水準）
+const ATTR_LEVELS = { price: 3, cacao: 3, effect: 3, cal: 3, fairtrade: 2 };
+
+// 各属性の水準ラベル（表示用）
+const LEVEL_LABELS = {
+  price:      ["100円", "200円", "300円"],
+  cacao:      ["30%", "50%", "70%"],
+  effect:     ["集中力が上がる", "睡眠を助ける", "特にない"],
+  cal:        ["150kcal", "250kcal", "350kcal"],
+  fairtrade:  ["なし", "あり"],
+};
+
+// 17セット×3択、51プロファイル（混合水準の直交計画）。各値は水準インデックス、ATTRS の順。
+// 3水準属性は各水準17回ずつ、2水準属性は25回/26回とほぼ均等に出現。
+const CONJOINT_SET_LEVELS = [
+  [[1, 2, 2, 2, 1], [0, 1, 0, 0, 0], [2, 2, 1, 1, 1]],
+  [[1, 0, 0, 2, 1], [2, 1, 0, 1, 1], [0, 2, 1, 2, 0]],
+  [[2, 0, 1, 0, 1], [1, 2, 2, 0, 0], [0, 0, 1, 2, 0]],
+  [[2, 2, 0, 2, 0], [1, 1, 1, 1, 1], [0, 2, 2, 1, 1]],
+  [[0, 0, 0, 2, 1], [2, 0, 1, 1, 1], [1, 1, 1, 0, 0]],
+  [[1, 0, 1, 2, 0], [0, 1, 0, 1, 0], [2, 1, 0, 2, 1]],
+  [[2, 0, 0, 0, 0], [0, 2, 0, 0, 0], [1, 0, 0, 0, 1]],
+  [[0, 2, 1, 2, 1], [2, 2, 0, 1, 0], [1, 0, 1, 1, 1]],
+  [[0, 1, 0, 0, 1], [1, 2, 2, 1, 0], [2, 1, 2, 0, 0]],
+  [[1, 1, 2, 2, 0], [0, 2, 1, 2, 0], [2, 0, 2, 0, 1]],
+  [[1, 0, 2, 1, 0], [0, 1, 2, 1, 0], [2, 2, 1, 0, 1]],
+  [[1, 2, 0, 0, 1], [2, 2, 2, 0, 0], [0, 1, 2, 1, 1]],
+  [[1, 1, 0, 2, 1], [0, 0, 2, 2, 1], [2, 1, 1, 2, 0]],
+  [[1, 1, 2, 2, 1], [0, 1, 1, 0, 1], [2, 0, 0, 1, 0]],
+  [[1, 2, 0, 1, 1], [0, 2, 2, 0, 1], [2, 2, 1, 1, 0]],
+  [[1, 1, 1, 0, 0], [0, 0, 2, 1, 0], [2, 1, 2, 2, 1]],
+  [[0, 0, 1, 0, 0], [1, 0, 0, 1, 0], [2, 0, 2, 2, 0]],
+];
+
+/* =========================================================================
+   2. タイプ判定ロジック（★ここを変更すれば計算方法を差し替え可能★）
+   多項ロジット（MNL）モデルによる個人内推定。効果コーディング（2係数/属性、
+   計9パラメータ、切片なし）＋ニュートン・ラフソン法＋軽いリッジ正則化（λ=1.2）で、
+   ブラウザ内で17回の回答からその場で部分効用を推定する。
+   各属性の重視度＝3水準の部分効用の範囲（max−min）。重視度が高い上位2属性の
+   組み合わせ（5C2=10通り）でタイプを決定する。
+   同点の場合は ATTRIBUTE_PRIORITY の並び順（先頭ほど優先）でタイブレークする。
+   ========================================================================= */
+
+// 効果コーディング（3水準は2係数・参照水準=水準3、2水準は1係数の対称コーディング）
+function effectCode(levelIdx, nLevels) {
+  if (nLevels === 3) {
+    if (levelIdx === 0) return [1, 0];
+    if (levelIdx === 1) return [0, 1];
+    return [-1, -1];
+  }
+  // 2水準
+  return levelIdx === 0 ? [1] : [-1];
+}
+function buildX(altLevels) {
+  const x = [];
+  altLevels.forEach((li, i) => x.push(...effectCode(li, ATTR_LEVELS[ATTRS[i]])));
+  return x; // length 11（3水準×5属性×2係数 + 2水準×1属性×1係数）
+}
+
+// 連立方程式ソルバー（ガウス・ジョルダン法、部分ピボット選択）
+function solveLinear(A, b) {
+  const n = A.length;
+  const M = A.map((row, i) => [...row, b[i]]);
+  for (let col = 0; col < n; col++) {
+    let piv = col;
+    for (let r = col + 1; r < n; r++) {
+      if (Math.abs(M[r][col]) > Math.abs(M[piv][col])) piv = r;
+    }
+    [M[col], M[piv]] = [M[piv], M[col]];
+    const d = M[col][col] || 1e-9;
+    for (let c = col; c <= n; c++) M[col][c] /= d;
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const f = M[r][col];
+      for (let c = col; c <= n; c++) M[r][c] -= f * M[col][c];
+    }
+  }
+  return M.map(row => row[n]);
+}
+
+// パラメータ総数（3水準属性×2係数 + 2水準属性×1係数）
+const N_PARAMS = ATTRS.reduce((sum, a) => sum + (ATTR_LEVELS[a] === 3 ? 2 : 1), 0);
+
+// 多項ロジット推定（ニュートン・ラフソン法＋リッジ正則化）
+function estimateMNL(choiceSets, choices) {
+  const P = N_PARAMS;
+  let beta = new Array(P).fill(0);
+  const lambda = 1.2; // 試行数に対しパラメータ数がやや際どい比率のため軽く安定化させる
+  const X = choiceSets.map(set => set.map(buildX)); // [15][3][P]
+
+  for (let iter = 0; iter < 40; iter++) {
+    const grad = new Array(P).fill(0);
+    const A = Array.from({ length: P }, () => new Array(P).fill(0));
+
+    for (let s = 0; s < X.length; s++) {
+      const xs = X[s];
+      const u = xs.map(x => x.reduce((sum, xi, k) => sum + xi * beta[k], 0));
+      const maxU = Math.max(...u);
+      const expU = u.map(v => Math.exp(v - maxU));
+      const sumExp = expU.reduce((a, b) => a + b, 0);
+      const p = expU.map(v => v / sumExp);
+
+      const chosen = choices[s];
+      for (let k = 0; k < P; k++) {
+        let mu = 0;
+        for (let j = 0; j < 3; j++) mu += p[j] * xs[j][k];
+        grad[k] += xs[chosen][k] - mu;
+      }
+      for (let k = 0; k < P; k++) {
+        for (let l = 0; l < P; l++) {
+          let val = 0;
+          for (let j = 0; j < 3; j++) val += p[j] * xs[j][k] * xs[j][l];
+          let muK = 0, muL = 0;
+          for (let j = 0; j < 3; j++) { muK += p[j] * xs[j][k]; muL += p[j] * xs[j][l]; }
+          A[k][l] += val - muK * muL;
+        }
+      }
+    }
+    for (let k = 0; k < P; k++) {
+      grad[k] -= lambda * beta[k];
+      A[k][k] += lambda;
+    }
+    const delta = solveLinear(A, grad);
+    let maxAbs = 0;
+    for (let k = 0; k < P; k++) { beta[k] += delta[k]; maxAbs = Math.max(maxAbs, Math.abs(delta[k])); }
+    if (maxAbs < 1e-6) break;
+  }
+  return beta;
+}
+
+function computeImportance(beta) {
+  const results = [];
+  let offset = 0;
+  ATTRS.forEach(attr => {
+    const nLevels = ATTR_LEVELS[attr];
+    let utils;
+    if (nLevels === 3) {
+      const b1 = beta[offset], b2 = beta[offset + 1], b3 = -(b1 + b2);
+      utils = [b1, b2, b3];
+      offset += 2;
+    } else {
+      const b1 = beta[offset];
+      utils = [b1, -b1]; // 対称コーディングなので水準0=+b1, 水準1=-b1
+      offset += 1;
+    }
+    const range = Math.max(...utils) - Math.min(...utils);
+    results.push({
+      attr,
+      label: ATTRIBUTE_LABELS[attr],
+      utils,
+      range,
+      bestLevel: LEVEL_LABELS[attr][utils.indexOf(Math.max(...utils))],
+    });
+  });
+  const totalRange = results.reduce((s, r) => s + r.range, 0) || 1;
+  results.forEach(r => r.pct = totalRange > 0 ? (r.range / totalRange * 100) : 0);
+  results.sort((x, y) => y.range - x.range);
+  return results;
+}
+
+// 属性の表示名
+const ATTRIBUTE_LABELS = {
+  price:      '価格',
+  cacao:      'カカオ量',
+  effect:     '特定の効果の有無',
+  cal:        'カロリー',
+  fairtrade:  'フェアトレード',
+};
+
+// 重視度が同点だった場合のタイブレーク優先順位（先頭ほど優先度が高い）
+const ATTRIBUTE_PRIORITY = ['price', 'cacao', 'effect', 'cal', 'fairtrade'];
+
+// 上位2属性の組み合わせ名（5C2=10通り）。キーは ATTRIBUTE_PRIORITY 順で正規化した「属性1+属性2」。
+const TYPE_NAMES_15 = {
+  'price+cacao':      'コスパ濃厚派タイプ',
+  'price+effect':     '効果こだわり節約タイプ',
+  'price+cal':        'ヘルシー節約タイプ',
+  'price+fairtrade':  'エシカル節約タイプ',
+  'cacao+effect':     'カカオ効能重視タイプ',
+  'cacao+cal':        '濃厚ヘルシー派タイプ',
+  'cacao+fairtrade':  'こだわりカカオ派タイプ',
+  'effect+cal':       '効果・カロリー両立タイプ',
+  'effect+fairtrade': 'エシカル効果重視タイプ',
+  'cal+fairtrade':    'ヘルシー&エシカルタイプ',
+};
+
+function calculateType(answers) {
+  const beta = estimateMNL(CONJOINT_SET_LEVELS, answers);
+  const ranked = computeImportance(beta); // 重視度(range)の降順で5属性がソート済み
+
+  const top1 = ranked[0].attr;
+  const top2 = ranked[1].attr;
+
+  // 表示・辞書引き用にキーの順序をATTRIBUTE_PRIORITY順に正規化
+  const [first, second] = [top1, top2].sort(
+    (a, b) => ATTRIBUTE_PRIORITY.indexOf(a) - ATTRIBUTE_PRIORITY.indexOf(b)
+  );
+  const typeKey = `${first}+${second}`;
+
+  return {
+    typeKey: typeKey,
+    typeName: TYPE_NAMES_15[typeKey] || '診断結果',
+    top1Label: ATTRIBUTE_LABELS[top1],
+    top2Label: ATTRIBUTE_LABELS[top2],
+    ranking: ranked,
+  };
+}
+
+/* =========================================================================
+   1.5. 診断結果に応じて、サイト4（選択実験）へ動的にURLを組み立てて遷移する
+   ========================================================================= */
+function buildRedirectUrl(typeResult) {
+  const [key1, key2] = typeResult.typeKey.split('+');
+  const ourKey1 = ATTR_KEY_MAP[key1];
+  const ourKey2 = ATTR_KEY_MAP[key2];
+  // ラウンド2で「次点に好ましい財」を計算するため、重要視2項目の水準別効用値も
+  // サイト4へ引き継ぐ（rankingは属性ごとに{attr, utils, ...}を持つ配列）。
+  const rankingByAttr = {};
+  typeResult.ranking.forEach(function(r){ rankingByAttr[r.attr] = r; });
+  const u1 = rankingByAttr[key1].utils; // 例：ワイン価格なら[水準0,水準1,水準2]の効用
+  const u2 = rankingByAttr[key2].utils;
+  const params = new URLSearchParams({
+    id: SYS.id, group: SYS.group, good1: SYS.good1, good2: SYS.good2, current: SYS.current,
+    good: GOOD_CODE, item1: ourKey1, item2: ourKey2, gender: SYS.gender, age: SYS.age,
+    u1: u1.join(','), u2: u2.join(',')
+  });
+  return BASE_URL + "site4/index.html?" + params.toString();
+}
+
+/* =========================================================================
+   3. 送信先設定（★Apps Scriptのデプロイ後、ここにURLを貼り付ける★）
+   ========================================================================= */
+const SCRIPT_URL = "https://script.google.com/macros/s/【ここにver2用の新しいデプロイIDを貼る】/exec";
+
+/* =========================================================================
+   4. 画面制御・状態管理
+   ========================================================================= */
+/* =========================================================================
+   3.5 本システム（サイト1〜4）との連携設定
+   ========================================================================= */
+const BASE_URL = "https://tomotakasuye191.github.io/CO-SE-ver2/";
+const GOOD_CODE = "chocolate"; // このツール自体が担当する財の内部コード
+
+// このツールの属性キー ⇔ サイト4側の属性キーの対応表
+const ATTR_KEY_MAP = {"price": "price", "cacao": "cacao_percent", "effect": "effect", "cal": "calorie", "fairtrade": "fairtrade"};
+
+// URLパラメータから、サイト1/サイト4から引き継いだ情報を読み取る
+const SYS_PARAMS = new URLSearchParams(window.location.search);
+const SYS = {
+  id: SYS_PARAMS.get('id') || '',
+  group: SYS_PARAMS.get('group') || '',
+  good1: SYS_PARAMS.get('good1') || '',
+  good2: SYS_PARAMS.get('good2') || '',
+  current: SYS_PARAMS.get('current') || '1',
+  gender: SYS_PARAMS.get('gender') || '',
+  age: SYS_PARAMS.get('age') || '',
+};
+
+// GASのコールドスタート対策：ページを開いた時点で軽く一度呼んでおく（結果は使わない）
+try { fetch(SCRIPT_URL, { method: 'GET', mode: 'no-cors' }).catch(function(){}); } catch(e) {}
+
+// サイト4の表示を速くするため、回答している間に裏で21枚の画像を先読みしておく
+for (let i = 1; i <= 21; i++) {
+  const preloadImg = new Image();
+  preloadImg.src = BASE_URL + "images/" + GOOD_CODE + "/" + i + ".jpg";
+}
+
+const state = {
+  studentId: "",
+  gender: null,
+  age: "",
+  currentSet: 0,
+  answers: new Array(CONJOINT_SET_LEVELS.length).fill(null),
+  lastTypeResult: null,
+};
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* --- 画面1: 開始 --- */
+document.getElementById('btn-start').addEventListener('click', () => {
+  state.currentSet = 0;
+  renderConjointSet();
+  showScreen('screen-conjoint');
+});
+
+/* --- 画面3: コンジョイント分析 --- */
+function renderProgressDots() {
+  const wrap = document.getElementById('progress-wrap');
+  wrap.innerHTML = '';
+  CONJOINT_SET_LEVELS.forEach((_, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'progress-dot';
+    if (i < state.currentSet) dot.classList.add('done');
+    if (i === state.currentSet) dot.classList.add('current');
+    wrap.appendChild(dot);
+  });
+}
+
+function renderOption(el, altLevels, label) {
+  const rows = ATTRS.map((a, i) =>
+    `<div class="attr-row"><span class="k">${ATTRIBUTE_LABELS[a]}</span><span class="v">${LEVEL_LABELS[a][altLevels[i]]}</span></div>`
+  ).join('');
+  el.innerHTML = `<div class="opt-label">選択肢 ${label}</div>${rows}`;
+}
+
+function renderConjointSet() {
+  const idx = state.currentSet;
+  const s = CONJOINT_SET_LEVELS[idx]; // [altA, altB, altC]、各要素は6属性の水準インデックス配列
+  document.getElementById('progress-label').textContent = `セット ${idx + 1} / ${CONJOINT_SET_LEVELS.length}`;
+  renderProgressDots();
+  renderOption(document.getElementById('option-A'), s[0], 'A');
+  renderOption(document.getElementById('option-B'), s[1], 'B');
+  renderOption(document.getElementById('option-C'), s[2], 'C');
+
+  // 選択状態・次へボタンをリセット
+  document.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('btn-next-set').disabled = true;
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+document.querySelectorAll('.option-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    state.answers[state.currentSet] = parseInt(card.dataset.choice, 10);
+    document.getElementById('btn-next-set').disabled = false;
+  });
+});
+
+document.getElementById('btn-next-set').addEventListener('click', () => {
+  if (state.answers[state.currentSet] === null) return;
+  state.currentSet += 1;
+  if (state.currentSet < CONJOINT_SET_LEVELS.length) {
+    renderConjointSet();
+  } else {
+    submitAnswers();
+  }
+});
+
+/* --- 結果表示 → バックグラウンドで送信 --- */
+function submitAnswers() {
+  // 診断結果は被験者には見せない（記録のみ）。送信画面に切り替えて、そのまま裏で送信する。
+  const typeResult = calculateType(state.answers);
+  state.lastTypeResult = typeResult;
+
+  document.getElementById('submit-status').textContent = '回答を記録しています…';
+  document.getElementById('btn-retry-submit').style.display = 'none';
+  showScreen('screen-result');
+
+  sendToSheet(typeResult);
+}
+
+function sendToSheet(typeResult) {
+  // アテンションチェックの構成は財ごとに異なる（設けていない財もある）ため、
+  // ATTENTION_CHECKSが存在する場合のみ、その内容に沿って動的に判定する。
+  let attentionCheck1 = '';
+  let attentionCheck2 = '';
+  if (typeof ATTENTION_CHECKS !== 'undefined') {
+    const acKeys = Object.keys(ATTENTION_CHECKS).map(Number).sort((a, b) => a - b);
+    if (acKeys.length >= 1) {
+      const k = acKeys[0];
+      attentionCheck1 = (state.answers[k - 1] === ATTENTION_CHECKS[k]) ? 'pass' : 'fail';
+    }
+    if (acKeys.length >= 2) {
+      const k = acKeys[1];
+      attentionCheck2 = (state.answers[k - 1] === ATTENTION_CHECKS[k]) ? 'pass' : 'fail';
+    }
+  }
+  const choiceLetters = state.answers.map(i => String.fromCharCode(65 + i)); // 0,1,2 -> A,B,C
+
+  const [key1, key2] = typeResult.typeKey.split('+');
+  const ourKey1 = ATTR_KEY_MAP[key1];
+  const ourKey2 = ATTR_KEY_MAP[key2];
+
+  const conjointPayload = {
+    action: 'submitConjoint',
+    id: SYS.id,
+    good: GOOD_CODE,
+    gender: SYS.gender,
+    age: SYS.age,
+    choices: choiceLetters,
+    attentionCheck1: attentionCheck1,
+    attentionCheck2: attentionCheck2,
+    item1: ourKey1,
+    item2: ourKey2,
+    typeName: typeResult.typeName,
+    ranking: typeResult.ranking, // 各属性のrange(重視度)・pct(構成比)・utils(各水準の効用値)
+  };
+
+  const importancePayload = {
+    action: 'submitImportance',
+    id: SYS.id,
+    good: GOOD_CODE,
+    items: [ourKey1, ourKey2],
+  };
+
+  function post(payload) {
+    return fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+    }).then(res => res.json());
+  }
+
+  Promise.all([post(conjointPayload), post(importancePayload)])
+    .then(([r1, r2]) => {
+      if (r1.status === 'ok' && r2.status === 'ok') {
+        document.getElementById('submit-status').textContent = '記録が完了しました。実験画面に移動します…';
+        document.getElementById('btn-retry-submit').style.display = 'none';
+        window.location.href = buildRedirectUrl(typeResult);
+      } else {
+        showSubmitError();
+      }
+    })
+    .catch(() => {
+      showSubmitError();
+    });
+}
+
+function showSubmitError() {
+  document.getElementById('submit-status').textContent = '回答の記録に失敗しました。お手数ですが下のボタンからもう一度お試しください。';
+  document.getElementById('btn-retry-submit').style.display = 'block';
+}
+
+document.getElementById('btn-retry-submit').addEventListener('click', () => {
+  document.getElementById('submit-status').textContent = '回答を記録しています…';
+  document.getElementById('btn-retry-submit').style.display = 'none';
+  sendToSheet(state.lastTypeResult);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>チョコレートに関する知識度調査</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6f5f0;
+    --surface: #ffffff;
+    --ink: #26242f;
+    --ink-soft: #6b6875;
+    --accent: #6e5ec4;
+    --accent-dark: #574aa0;
+    --accent-soft: #ece8f9;
+    --mint: #3fa796;
+    --mint-soft: #e2f4f1;
+    --border: #e3e1da;
+    --danger: #c85c5c;
+    --radius: 18px;
+    --font-display: 'Zen Maru Gothic', 'Noto Sans JP', sans-serif;
+    --font-body: 'Noto Sans JP', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+    min-height: 100vh;
+  }
+
+  .card {
+    max-width: 680px;
+    margin-left: auto;
+    margin-right: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    box-shadow: 0 1px 2px rgba(38,36,47,0.03);
+  }
+
+  header.top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+    max-width: 680px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .yogurt-mark {
+    width: 34px; height: 34px;
+    border-radius: 10px;
+    background: linear-gradient(160deg, var(--accent), var(--mint));
+    flex-shrink: 0;
+  }
+
+  header.top .title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--ink-soft);
+    letter-spacing: .02em;
+  }
+
+  .screen { display: none; animation: fadein .35s ease; }
+  .screen.active { display: block; }
+
+  @keyframes fadein {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 900;
+    margin: 0 0 14px;
+    line-height: 1.4;
+  }
+
+  h2 {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 12px;
+  }
+
+  p { margin: 0 0 14px; color: var(--ink); }
+  .muted { color: var(--ink-soft); font-size: 14px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 14px 22px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: var(--font-body);
+    cursor: pointer;
+    width: 100%;
+    transition: background .15s ease, transform .1s ease;
+  }
+  .btn:hover { background: var(--accent-dark); }
+  .btn:active { transform: scale(.99); }
+  .btn:disabled { background: #c9c6d6; cursor: not-allowed; }
+  .btn.secondary {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  .btn.secondary:hover { background: var(--accent-soft); }
+  .btn-row { display: flex; gap: 10px; margin-top: 24px; }
+  .btn-row .btn { width: auto; flex: 1; }
+
+  .consent-box {
+    background: var(--accent-soft);
+    border-radius: 12px;
+    padding: 16px 18px;
+    font-size: 13.5px;
+    color: var(--ink);
+    margin-bottom: 20px;
+  }
+  .consent-box ul { margin: 6px 0 0; padding-left: 18px; }
+  .consent-box li { margin-bottom: 4px; }
+
+  .progress-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+    max-width: 680px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .progress-dot {
+    flex: 1;
+    height: 6px;
+    border-radius: 4px;
+    background: var(--border);
+    transition: background .25s ease;
+  }
+  .progress-dot.done { background: var(--mint); }
+  .progress-dot.current { background: var(--accent); }
+  .progress-label {
+    font-size: 13px;
+    color: var(--ink-soft);
+    font-weight: 700;
+    margin-bottom: 10px;
+    max-width: 680px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .section-badge {
+    display: inline-block;
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent-dark);
+    background: var(--accent-soft);
+    border-radius: 999px;
+    padding: 4px 12px;
+    margin: 28px 0 10px;
+  }
+  .section-badge.first { margin-top: 0; }
+
+  .q-block {
+    padding: 18px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .q-block:last-child { border-bottom: none; }
+  .q-num {
+    font-size: 12px;
+    color: var(--accent-dark);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .q-text-inline {
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 14px;
+  }
+
+  /* 数字＋丸のリッカート形式 */
+  .likert { display: flex; justify-content: space-between; gap: 4px; margin-top: 6px; }
+  .likert .pt { flex: 1; text-align: center; }
+  .likert label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--ink-soft);
+    font-weight: 600;
+  }
+  .likert input {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    cursor: pointer;
+    transition: all .15s ease;
+    position: relative;
+  }
+  .likert input:hover { border-color: var(--accent); }
+  .likert input:checked {
+    border-color: var(--accent);
+    background: var(--accent);
+    box-shadow: inset 0 0 0 4px #fff;
+  }
+  .likert-caption {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    margin-top: 10px;
+  }
+
+  .options-list { display: flex; flex-direction: column; gap: 10px; }
+  .option-card {
+    border: 2px solid var(--border);
+    border-radius: 16px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: all .15s ease;
+    background: #fff;
+    font-size: 14.5px;
+  }
+  .option-card:hover { border-color: var(--accent); }
+  .option-card.selected {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    font-weight: 700;
+  }
+
+  .result-badges { display: flex; gap: 8px; justify-content: center; margin-bottom: 18px; flex-wrap: wrap; }
+  .badge {
+    background: var(--mint-soft);
+    color: #1f6e61;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .hint { font-size: 12.5px; color: var(--danger); margin-top: 10px; min-height: 16px; text-align: center; }
+
+  .stat-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
+  .stat { background: var(--mint-soft); border-radius: 12px; padding: 12px 16px; min-width: 110px; }
+  .stat .n { font-family: var(--font-display); font-size: 24px; font-weight: 900; color: var(--accent-dark); }
+  .stat .l { font-size: 11.5px; color: var(--ink-soft); }
+
+  .admin-scroll { overflow-x: auto; max-width: 100%; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+  th, td { border: 1px solid var(--border); padding: 5px 7px; text-align: left; white-space: nowrap; }
+  th { background: var(--accent-soft); color: var(--accent-dark); position: sticky; top: 0; }
+
+  footer.note { text-align: center; font-size: 12px; color: var(--ink-soft); margin-top: 24px; }
+  .footer-link {
+    display: block;
+    text-align: center;
+    margin-top: 30px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    text-decoration: none;
+    opacity: .7;
+  }
+  .footer-link:hover { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div class="yogurt-mark"></div>
+    <div class="title">チョコレートに関する知識度調査</div>
+  </header>
+
+  <!-- ============ 画面1: 同意・導入 ============ -->
+  <section id="screen-intro" class="screen active">
+    <div class="card">
+      <h1>チョコレートについての知識度調査</h1>
+      <p>この調査は、卒業論文の研究の一環として実施しています。チョコレートについてどの程度知っているかを、簡単な質問形式でお伺いします。所要時間は約3〜5分です。</p>
+      <div class="consent-box">
+        <strong>ご回答にあたって</strong>
+        <ul>
+          <li>回答は研究目的にのみ使用し、個人が特定される形で公開することはありません。</li>
+          <li>知らない設問があっても構いません。最も近いと思うものを選んでください。</li>
+          <li>全17問（パート1:5問＋購入頻度1問／パート2:11問）です。</li>
+        </ul>
+      </div>
+      <button class="btn" id="btn-start">同意して回答をはじめる</button>
+    </div>
+  </section>
+
+  <!-- ============ 画面2: パート1（1ページにまとめてスクロール） ============ -->
+  <section id="screen-subjective" class="screen">
+    <div class="progress-label">STEP 1 / 2　パート1</div>
+    <div class="progress-wrap">
+      <div class="progress-dot current"></div>
+      <div class="progress-dot"></div>
+    </div>
+    <div class="card">
+      <p class="muted">それぞれの文について、あなた自身にどの程度あてはまるか選んでください。</p>
+      <div id="subjective-list"></div>
+      <div id="frequency-block"></div>
+      <div class="hint" id="subjective-hint"></div>
+      <div class="btn-row">
+        <button class="btn" id="btn-to-objective">次へ</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 画面3: パート2（1ページにまとめてスクロール） ============ -->
+  <section id="screen-objective" class="screen">
+    <div class="progress-label">STEP 2 / 2　パート2</div>
+    <div class="progress-wrap">
+      <div class="progress-dot done"></div>
+      <div class="progress-dot current"></div>
+    </div>
+    <div class="card">
+      <p class="muted">チョコレートについての知識を問う設問です。</p>
+      <div id="objective-list"></div>
+      <div class="hint" id="objective-hint"></div>
+      <div class="btn-row">
+        <button class="btn secondary" id="btn-back-subjective">戻る</button>
+        <button class="btn" id="btn-submit">回答を送信する</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 画面4: 完了 ============ -->
+  <section id="screen-thanks" class="screen">
+    <div class="card">
+      <h2 style="text-align:center;">ご回答ありがとうございました</h2>
+      <p class="muted" id="submit-status" style="text-align:center;">回答を記録しています…</p>
+      <button class="btn secondary" id="btn-retry-submit" style="display:none;">回答をもう一度記録する</button>
+    </div>
+    <footer class="note">回答データは研究目的にのみ使用されます。</footer>
+  </section>
+
+</div>
+
+<script>
+const SURVEY_KEY_PREFIX = 'response:chocolate:';
+const PRODUCT = 'チョコレート';
+
+/* =========================================================================
+   本システム（サイト1〜5）との連携設定
+   ========================================================================= */
+const BASE_URL = "https://tomotakasuye191.github.io/CO-SE-ver2/";
+const GAS_URL = "https://script.google.com/macros/s/【ここにver2用の新しいデプロイIDを貼る】/exec";
+const GOOD_CODE = "chocolate";
+
+const SYS_PARAMS = new URLSearchParams(window.location.search);
+const SYS = {
+  id: SYS_PARAMS.get('id') || '',
+  group: SYS_PARAMS.get('group') || '',
+  good1: SYS_PARAMS.get('good1') || '',
+  good2: SYS_PARAMS.get('good2') || '',
+  gender: SYS_PARAMS.get('gender') || '',
+  age: SYS_PARAMS.get('age') || '',
+  qseq: SYS_PARAMS.get('qseq') || '1', // 知識アンケート2財分のうち、1つ目か2つ目か
+};
+
+// GASのコールドスタート対策：ページを開いた時点で軽く一度呼んでおく（結果は使わない）
+try { fetch(GAS_URL, { method: 'GET', mode: 'no-cors' }).catch(function(){}); } catch(e) {}
+
+function buildNextUrl() {
+  if (SYS.qseq === '1') {
+    // 財1の知識アンケートが終わった → 続けて財2の知識アンケートへ
+    const params = new URLSearchParams({
+      id: SYS.id, group: SYS.group, good1: SYS.good1, good2: SYS.good2,
+      gender: SYS.gender, age: SYS.age, qseq: '2'
+    });
+    return BASE_URL + 'site5/' + SYS.good2 + '.html?' + params.toString();
+  } else {
+    // 財2の知識アンケートも終わった → 実験は全て終了
+    const params = new URLSearchParams({ id: SYS.id });
+    return BASE_URL + 'complete/index.html?' + params.toString();
+  }
+}
+
+
+const subjectiveItems = [
+  '私はチョコレートについて詳しい方だと思う',
+  'チョコレートの種類やブランドの違いをよく理解している',
+  '友人にチョコレートについて聞かれたら、詳しく説明できる自信がある',
+  'チョコレートを選ぶ際、自分の知識に自信を持って選べる',
+  '他の人と比べて、チョコレートについての知識は豊富な方だと思う'
+];
+
+const conceptQuestions = [
+  {q:'チョコレートの主原料である「カカオマス」の説明として正しいものはどれですか。', opts:['カカオ豆から抽出した油脂成分のみを指す','カカオ豆を発酵・焙煎し、すりつぶしたペースト状のもの','チョコレートに加える砂糖の一種','カカオの殻を粉末にしたもの'], correct:1},
+  {q:'「カカオ分〇〇%」という表示の意味として最も適切なものはどれですか。', opts:['チョコレート全体に占めるカカオ由来成分（カカオマス・カカオバターなど）の割合','使用している砂糖の割合','チョコレートの色の濃さを示す数値','保存料の含有割合'], correct:0},
+  {q:'チョコレートに含まれる「ポリフェノール」に関して一般的に語られる内容として適切なものはどれですか。', opts:['血糖値を薬理的に下げる効果が医学的に確立している','抗酸化作用があるとされる成分である','摂取量に関わらず必ず健康効果が得られる','加熱すると効果が増大することが確立している'], correct:1},
+  {q:'チョコレートの適切な保存方法として正しいものはどれですか。', opts:['冷蔵庫で保存すれば風味が損なわれることはない','直射日光や高温多湿を避け、涼しく乾燥した場所で保存する','常温でも冷蔵でも品質に違いは生じない','冷凍保存が最も一般的に推奨される'], correct:1},
+  {q:'「クーベルチュールチョコレート」の説明として正しいものはどれですか。', opts:['安価な代用チョコレートの一種である','カカオバターを一定以上含む、製菓用の高品質なチョコレートを指す','ミルクを含まないチョコレートの総称である','チョコレートの産地を示す名称である'], correct:1}
+];
+
+const brandQuestions = [
+  {q:'日本の「ガーナチョコレート」を製造しているメーカーはどこですか。', opts:['ロッテ','明治','森永製菓','江崎グリコ'], correct:0},
+  {q:'「ゴディバ」はどこの国発祥のブランドですか。', opts:['フランス','ベルギー','スイス','イタリア'], correct:1},
+  {q:'「きのこの山」を製造しているメーカーはどこですか。', opts:['明治','森永製菓','ロッテ','江崎グリコ'], correct:0},
+  {q:'「リンツ」はどこの国発祥のブランドですか。', opts:['ドイツ','スイス','オーストリア','ベルギー'], correct:1},
+  {q:'「アルフォート」を製造しているメーカーはどこですか。', opts:['ブルボン','森永製菓','明治','江崎グリコ'], correct:0},
+  {q:'「フェレロ・ロシェ」はどこの国発祥のブランドですか。', opts:['フランス','イタリア','スイス','ベルギー'], correct:1}
+];
+
+const purchaseFrequencyOptions = ['週に3回以上','週に1〜2回','月に2〜3回','月に1回程度','ほとんど購入しない'];
+
+const state = {
+  subjective: new Array(subjectiveItems.length).fill(null),
+  purchaseFrequency: null,
+  concept: new Array(conceptQuestions.length).fill(null),
+  brand: new Array(brandQuestions.length).fill(null)
+};
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+/* ---------- 主観的知識ページの描画 ---------- */
+function renderSubjectivePage(){
+  const wrap = document.getElementById('subjective-list');
+  wrap.innerHTML = '';
+  subjectiveItems.forEach((text,i)=>{
+    const block = document.createElement('div');
+    block.className = 'q-block';
+    block.innerHTML = `
+      <div class="q-num">Q${i+1}</div>
+      <div class="q-text-inline">${text}</div>
+      <div class="likert">
+        ${[1,2,3,4,5,6,7].map(v=>`
+          <div class="pt">
+            <label>
+              <input type="radio" name="subj${i}" value="${v}" ${state.subjective[i]===v?'checked':''}>
+              ${v}
+            </label>
+          </div>
+        `).join('')}
+      </div>
+      <div class="likert-caption"><span>全くそう思わない</span><span>非常にそう思う</span></div>
+    `;
+    block.querySelectorAll('input').forEach(inp=>{
+      inp.addEventListener('change', ()=>{
+        state.subjective[i] = parseInt(inp.value);
+        document.getElementById('subjective-hint').textContent = '';
+      });
+    });
+    wrap.appendChild(block);
+  });
+  renderFrequencyBlock();
+}
+
+function renderFrequencyBlock(){
+  const fwrap = document.getElementById('frequency-block');
+  fwrap.innerHTML = '';
+  const block = document.createElement('div');
+  block.className = 'q-block';
+  const num = document.createElement('div');
+  num.className = 'q-num';
+  num.textContent = '購入頻度';
+  const text = document.createElement('div');
+  text.className = 'q-text-inline';
+  text.textContent = `あなたは平均してどのくらいの頻度で${PRODUCT}を購入しますか。`;
+  const list = document.createElement('div');
+  list.className = 'options-list';
+  purchaseFrequencyOptions.forEach((label, oi)=>{
+    const card = document.createElement('div');
+    card.className = 'option-card';
+    if(state.purchaseFrequency === oi) card.classList.add('selected');
+    card.textContent = label;
+    card.addEventListener('click', ()=>{
+      state.purchaseFrequency = oi;
+      document.getElementById('subjective-hint').textContent = '';
+      renderFrequencyBlock();
+    });
+    list.appendChild(card);
+  });
+  block.appendChild(num);
+  block.appendChild(text);
+  block.appendChild(list);
+  fwrap.appendChild(block);
+}
+
+document.getElementById('btn-to-objective').addEventListener('click', ()=>{
+  if(state.subjective.some(v=>v===null) || state.purchaseFrequency === null){
+    document.getElementById('subjective-hint').textContent = 'すべての項目に回答してください。';
+    return;
+  }
+  showScreen('screen-objective');
+});
+
+/* ---------- 客観的知識ページの描画（概念＋ブランドを1ページに） ---------- */
+function renderObjectivePage(){
+  const wrap = document.getElementById('objective-list');
+  wrap.innerHTML = '';
+  conceptQuestions.forEach((item,i)=>{
+    wrap.appendChild(buildMCBlock(`Q${i+1}`, item, state.concept, i, 'concept'));
+  });
+  brandQuestions.forEach((item,i)=>{
+    wrap.appendChild(buildMCBlock(`Q${conceptQuestions.length + i + 1}`, item, state.brand, i, 'brand'));
+  });
+}
+
+function buildMCBlock(label, item, answerArr, idx, group){
+  const block = document.createElement('div');
+  block.className = 'q-block';
+  const num = document.createElement('div');
+  num.className = 'q-num';
+  num.textContent = label;
+  const text = document.createElement('div');
+  text.className = 'q-text-inline';
+  text.textContent = item.q;
+  const list = document.createElement('div');
+  list.className = 'options-list';
+
+  item.opts.forEach((optText, oi)=>{
+    const card = document.createElement('div');
+    card.className = 'option-card';
+    if(answerArr[idx] === oi) card.classList.add('selected');
+    card.textContent = optText;
+    card.addEventListener('click', ()=>{
+      answerArr[idx] = oi;
+      document.getElementById('objective-hint').textContent = '';
+      renderObjectivePage();
+    });
+    list.appendChild(card);
+  });
+
+  block.appendChild(num);
+  block.appendChild(text);
+  block.appendChild(list);
+  return block;
+}
+
+document.getElementById('btn-back-subjective').addEventListener('click', ()=>{
+  showScreen('screen-subjective');
+});
+
+document.getElementById('btn-submit').addEventListener('click', ()=>{
+  if(state.concept.some(v=>v===null) || state.brand.some(v=>v===null)){
+    document.getElementById('objective-hint').textContent = 'すべての設問に回答してください。';
+    return;
+  }
+  submitAnswers();
+});
+
+document.getElementById('btn-start').addEventListener('click', ()=>{
+  renderSubjectivePage();
+  renderObjectivePage();
+  showScreen('screen-subjective');
+});
+
+/* ---------- 送信・記録 ---------- */
+function uid(){
+  return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8);
+}
+
+function buildRecord(){
+  const conceptCorrect = state.concept.map((ans,i)=> ans === conceptQuestions[i].correct ? 1 : 0);
+  const brandCorrect = state.brand.map((ans,i)=> ans === brandQuestions[i].correct ? 1 : 0);
+  const subjAvg = state.subjective.reduce((a,b)=>a+b,0) / state.subjective.length;
+
+  return {
+    id: uid(),
+    product: PRODUCT,
+    timestamp: new Date().toISOString(),
+    subjective_raw: state.subjective.slice(),
+    subjective_avg: Number(subjAvg.toFixed(2)),
+    purchase_frequency_index: state.purchaseFrequency,
+    purchase_frequency_label: purchaseFrequencyOptions[state.purchaseFrequency],
+    concept_answers: state.concept.slice(),
+    concept_correct: conceptCorrect,
+    concept_score: conceptCorrect.reduce((a,b)=>a+b,0),
+    concept_total: conceptQuestions.length,
+    brand_answers: state.brand.slice(),
+    brand_correct: brandCorrect,
+    brand_score: brandCorrect.reduce((a,b)=>a+b,0),
+    brand_total: brandQuestions.length,
+    objective_total_score: conceptCorrect.reduce((a,b)=>a+b,0) + brandCorrect.reduce((a,b)=>a+b,0)
+  };
+}
+
+function submitAnswers(){
+  const record = buildRecord();
+  document.getElementById('submit-status').textContent = '回答を記録しています…';
+  document.getElementById('btn-retry-submit').style.display = 'none';
+  showScreen('screen-thanks');
+  sendToGAS(record, false);
+}
+
+function sendToGAS(record, isAutoRetry){
+  const payload = {
+    action: 'submitKnowledge',
+    id: SYS.id,
+    good: GOOD_CODE,
+    subjectiveAvg: record.subjective_avg,
+    purchaseFrequencyIndex: record.purchase_frequency_index,
+    purchaseFrequencyLabel: record.purchase_frequency_label,
+    conceptScore: record.concept_score,
+    conceptTotal: record.concept_total,
+    brandScore: record.brand_score,
+    brandTotal: record.brand_total,
+    objectiveScore: record.objective_total_score,
+    objectiveTotal: record.concept_total + record.brand_total,
+  };
+
+  fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload),
+  }).then(res => res.json())
+    .then(data => {
+      if (data.status === 'ok') {
+        document.getElementById('submit-status').textContent = '記録が完了しました。実験画面に移動します…';
+        document.getElementById('btn-retry-submit').style.display = 'none';
+        window.location.href = buildNextUrl();
+      } else {
+        if (!isAutoRetry) { setTimeout(() => sendToGAS(record, true), 800); return; }
+        document.getElementById('submit-status').textContent = data.message || '回答の記録に失敗しました。お手数ですが下のボタンからもう一度お試しください。';
+        document.getElementById('btn-retry-submit').style.display = 'block';
+      }
+    })
+    .catch(() => {
+      if (!isAutoRetry) { setTimeout(() => sendToGAS(record, true), 800); return; }
+      document.getElementById('submit-status').textContent = '通信エラーが発生しました。お手数ですが下のボタンからもう一度お試しください。';
+      document.getElementById('btn-retry-submit').style.display = 'block';
+    });
+}
+
+document.getElementById('btn-retry-submit').addEventListener('click', ()=>{
+  document.getElementById('submit-status').textContent = '回答を記録しています…';
+  document.getElementById('btn-retry-submit').style.display = 'none';
+  sendToGAS(buildRecord(), false);
+});
+</script>
+</body>
+</html>

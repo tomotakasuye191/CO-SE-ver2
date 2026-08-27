@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>画像・商品名 対応チェック</title>
+<style>
+  :root{ --ink:#1c2b24; --paper:#f6f4ee; --line:#c9c2ae; --accent:#2f5d4f; }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Hiragino Sans","Yu Gothic",-apple-system,BlinkMacSystemFont,sans-serif;
+    padding:24px 16px 60px;
+  }
+  .wrap{ max-width:1100px; margin:0 auto; }
+  h1{ font-size:20px; margin:0 0 6px; }
+  p.desc{ font-size:13.5px; color:#4b554e; line-height:1.8; margin:0 0 24px; }
+  h2{
+    font-size:15px;
+    margin:32px 0 12px;
+    padding-bottom:6px;
+    border-bottom:2px solid var(--accent);
+    color:var(--accent);
+  }
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));
+    gap:10px;
+  }
+  .card{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:8px;
+    font-size:11.5px;
+  }
+  .no{
+    display:inline-block;
+    font-size:10px;
+    font-weight:700;
+    color:#fff;
+    background:var(--accent);
+    padding:1px 6px;
+    border-radius:8px;
+    margin-bottom:6px;
+  }
+  .thumb{
+    width:100%;
+    aspect-ratio:1/1;
+    background:#fff;
+    border:1px solid #ece7db;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    margin-bottom:6px;
+  }
+  .thumb img{ width:100%; height:100%; object-fit:contain; }
+  .thumb.broken{
+    background:#fbeae6;
+    color:#a3402f;
+    font-weight:700;
+    text-align:center;
+    padding:6px;
+  }
+  .name{ font-weight:700; line-height:1.4; min-height:2.6em; }
+  .path{ color:#9aa19a; font-size:10px; margin-top:4px; word-break:break-all; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>画像・商品名の対応チェック</h1>
+    <p class="desc">
+      各財21商品について、「番号・商品名・画像」を一覧表示します。<br>
+      画像が商品名と違う、または画像が表示されない(赤色の枠)場合は、<code>images</code>フォルダ内のファイル名・配置が間違っています。<br>
+      このページは実験には使わない確認専用ページです（そのままリンクしても被験者には案内不要です）。
+    </p>
+    <div id="output">読み込んでいます…</div>
+  </div>
+
+<script src="../data/products.js"></script>
+<script>
+  const GOOD_LABELS = { yogurt:'ヨーグルト', rice:'お米', wine:'ワイン', chocolate:'チョコレート' };
+  const output = document.getElementById('output');
+
+  if(!window.PRODUCTS){
+    output.textContent = 'products.js が読み込めませんでした。';
+  } else {
+    output.innerHTML = '';
+    Object.keys(GOOD_LABELS).forEach(function(good){
+      const items = window.PRODUCTS[good] || [];
+      const section = document.createElement('div');
+      section.innerHTML = '<h2>' + GOOD_LABELS[good] + '（' + items.length + '件）</h2>';
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+
+      items.forEach(function(p){
+        const card = document.createElement('div');
+        card.className = 'card';
+        const imgPath = '../images/' + p.image;
+        card.innerHTML =
+          '<span class="no">No.' + p.id + '</span>' +
+          '<div class="thumb"><img src="' + imgPath + '" ' +
+            'onerror="this.parentElement.classList.add(\'broken\'); this.remove(); this.parentElement.textContent=\'画像が見つかりません\';"></div>' +
+          '<div class="name">' + p.name + '</div>' +
+          '<div class="path">' + imgPath + '</div>';
+        grid.appendChild(card);
+      });
+
+      section.appendChild(grid);
+      output.appendChild(section);
+    });
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ご協力ありがとうございました</title>
+<style>
+  body{
+    margin:0;
+    min-height:100vh;
+    background:#f6f4ee;
+    color:#1c2b24;
+    font-family:"Hiragino Sans","Yu Gothic",-apple-system,BlinkMacSystemFont,sans-serif;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+  }
+  .card{
+    max-width:480px;
+    background:#fff;
+    border:1px solid #c9c2ae;
+    border-radius:2px;
+    padding:44px 36px;
+    text-align:center;
+    position:relative;
+  }
+  .card::before{
+    content:"";
+    position:absolute;
+    top:0; left:0; right:0;
+    height:4px;
+    background:#2f5d4f;
+  }
+  h1{ font-size:20px; margin:0 0 16px; }
+  p{ font-size:14px; line-height:1.9; color:#4b554e; margin:0; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>ご協力ありがとうございました</h1>
+    <p>
+      実験は以上ですべて終了です。<br>
+      回答内容は正常に記録されました。<br><br>
+      このままブラウザを閉じていただいて構いません。
+    </p>
+  </div>
+</body>
+</html>

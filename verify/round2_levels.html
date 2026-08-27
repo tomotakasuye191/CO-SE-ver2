@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2回目CO：水準対応チェック</title>
+<style>
+  :root{ --ink:#1c2b24; --paper:#f6f4ee; --line:#c9c2ae; --accent:#2f5d4f; --warn:#a3402f; }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Hiragino Sans","Yu Gothic",-apple-system,BlinkMacSystemFont,sans-serif;
+    padding:24px 16px 60px;
+  }
+  .wrap{ max-width:1100px; margin:0 auto; }
+  h1{ font-size:20px; margin:0 0 6px; }
+  p.desc{ font-size:13.5px; color:#4b554e; line-height:1.8; margin:0 0 24px; }
+  h2{
+    font-size:15px; margin:32px 0 8px; padding-bottom:6px;
+    border-bottom:2px solid var(--accent); color:var(--accent);
+  }
+  .summary{ font-size:12.5px; color:#7a3325; background:#fbeae6; border:1px solid #e6c3ba; padding:8px 12px; border-radius:2px; margin-bottom:10px; }
+  table{ width:100%; border-collapse:collapse; font-size:12px; background:#fff; }
+  th, td{ border:1px solid var(--line); padding:5px 7px; text-align:left; }
+  th{ background:var(--accent); color:#fff; font-weight:600; }
+  td.null{ color:var(--warn); font-weight:700; }
+  tr:nth-child(even){ background:#faf9f5; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>2回目CO：実商品 → コンジョイント水準 対応チェック</h1>
+    <p class="desc">
+      <code>data/products_round2.js</code>の各商品について、<code>data/round2_levels.js</code>が
+      各属性をコンジョイントのどの水準（0/1/2）に割り当てているかを一覧表示します。<br>
+      <span style="color:var(--warn);font-weight:700;">赤字のNULL</span>は「対応する水準が見つからなかった」属性です（似せる基準の計算では効用0として扱われます）。<br>
+      このページは実験には使わない確認専用ページです（被験者への案内不要）。
+    </p>
+    <div id="output">読み込んでいます…</div>
+  </div>
+
+<script src="../data/products_round2.js"></script>
+<script src="../data/round2_levels.js"></script>
+<script>
+  const GOOD_LABELS = { yogurt:'ヨーグルト', rice:'お米', wine:'ワイン', chocolate:'チョコレート' };
+  const FIELD_DEFS = {
+    yogurt: [['price','価格'],['volume','内容量'],['expiry','消費期限'],['nutrition','栄養情報'],['calorie','カロリー']],
+    rice: [['price','価格'],['origin','産地'],['volume','内容量'],['harvest','精米時期'],['polish','精米度合い']],
+    wine: [['price','価格'],['origin','ブドウ産地'],['abv','アルコール度数'],['color','色'],['taste','味わい']],
+    chocolate: [['price','価格'],['cacao_percent','カカオ量'],['effect','特定の効果の有無'],['calorie','カロリー'],['fairtrade','フェアトレード']]
+  };
+  const output = document.getElementById('output');
+
+  if(!window.PRODUCTS_ROUND2 || !window.Round2Levels){
+    output.textContent = 'products_round2.js または round2_levels.js が読み込めませんでした。';
+  } else {
+    output.innerHTML = '';
+    Object.keys(GOOD_LABELS).forEach(function(good){
+      const items = window.PRODUCTS_ROUND2[good] || [];
+      const fields = FIELD_DEFS[good];
+      const nullCount = {};
+      fields.forEach(function(f){ nullCount[f[0]] = 0; });
+
+      const section = document.createElement('div');
+      section.innerHTML = '<h2>' + GOOD_LABELS[good] + '（' + items.length + '件）</h2>';
+
+      const table = document.createElement('table');
+      let thead = '<tr><th>ID</th><th>商品名</th>';
+      fields.forEach(function(f){ thead += '<th>' + f[1] + '</th>'; });
+      thead += '</tr>';
+      let rows = '';
+      items.forEach(function(p){
+        rows += '<tr><td>' + p.id + '</td><td>' + p.name + '</td>';
+        fields.forEach(function(f){
+          const key = f[0];
+          const raw = p.attrs[key];
+          const lvl = window.Round2Levels.getLevelIndex(good, key, raw);
+          if(lvl === null){ nullCount[key]++; }
+          rows += '<td' + (lvl === null ? ' class="null"' : '') + '>' +
+                  raw + ' → ' + (lvl === null ? 'NULL' : ('水準' + lvl)) + '</td>';
+        });
+        rows += '</tr>';
+      });
+      table.innerHTML = thead + rows;
+      section.appendChild(table);
+
+      const nullSummary = fields
+        .filter(function(f){ return nullCount[f[0]] > 0; })
+        .map(function(f){ return f[1] + '：' + nullCount[f[0]] + '/' + items.length + '件がNULL'; });
+      if(nullSummary.length){
+        const summary = document.createElement('div');
+        summary.className = 'summary';
+        summary.textContent = '注意：' + nullSummary.join('／');
+        section.insertBefore(summary, table);
+      }
+
+      output.appendChild(section);
+    });
+  }
+</script>
+</body>
+</html>
