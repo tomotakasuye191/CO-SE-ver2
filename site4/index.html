@@ -431,6 +431,16 @@
     const pool = round1Pool;
     const presented = sampleN(pool, size);
 
+    // 「合理的裁量財」：基準財より、この被験者が合理的なら必ず好ましいはずの財を
+    // 必ず候補内に1つ含める（似せる仕組みとは完全に別・毎回このスライドごとに計算し直す）。
+    let mandatory = null;
+    if(u1 && u2 && window.Round2Levels){
+      mandatory = window.Round2Levels.findMandatoryItem(good, item1, item2, u1, u2, baseItem, pool, presented, []);
+      if(mandatory && mandatory.replace){
+        presented[mandatory.replaceIndex] = mandatory.replaceWith;
+      }
+    }
+
     let html = '';
     html += '<div class="top"><span class="eyebrow">SITE 4 / ' + goodLabel + '（1回目）</span>' +
             '<span class="progress">STEP ' + currentStepNo() + ' / ' + TOTAL_STEPS + '（候補' + size + '個）</span></div>';
@@ -448,9 +458,13 @@
     // 基準財カード（左固定、実データのまま）
     basePanel.appendChild(buildCard(baseItem, { isBase:true, hideImage:false, overrides:null }));
 
-    // 候補カード（すべて実データのまま、操作なし）
+    // 候補カード（合理的裁量財の枠のみ、必要なら属性値を上書き）
     presented.forEach(function(p){
-      grid.appendChild(buildCard(p, { isBase:false, hideImage:false, overrides:null }));
+      let overrides = null;
+      if(mandatory && mandatory.overridden && p.id === mandatory.id){
+        overrides = mandatory.overrides;
+      }
+      grid.appendChild(buildCard(p, { isBase:false, hideImage:false, overrides:overrides }));
     });
 
     const clickable = Array.from(basePanel.children).concat(Array.from(grid.children));
@@ -463,6 +477,10 @@
         round1Records.push({
           size: size,
           presentedIds: presented.map(function(p){ return p.id; }),
+          mandatoryId: mandatory ? mandatory.id : null,
+          mandatoryName: mandatory ? mandatory.name : null,
+          mandatoryOverridden: mandatory ? mandatory.overridden : false,
+          mandatoryChosen: mandatory ? (String(clickedId) === String(mandatory.id)) : false,
           kept: kept,
           chosenId: clickedId,
           chosenName: chosen ? chosen.name : baseItem.name
@@ -517,6 +535,17 @@
     const restForCommon = presented.filter(function(p){ return p.id !== anchor.id; });
     const commonSet = new Set([anchor.id].concat(sampleN(restForCommon, commonCount - 1).map(function(p){ return p.id; })));
 
+    // 「合理的裁量財」：基準財より合理的に必ず好ましいはずの財を、
+    // アンカー・似せた財(commonSet)の枠とは完全に別の枠に必ず1つ含める。
+    let mandatory = null;
+    if(u1 && u2 && window.Round2Levels){
+      const protectedIds = Array.from(commonSet);
+      mandatory = window.Round2Levels.findMandatoryItem(good, item1, item2, u1, u2, baseItem, pool2, presented, protectedIds);
+      if(mandatory && mandatory.replace){
+        presented[mandatory.replaceIndex] = mandatory.replaceWith;
+      }
+    }
+
     const overrideFields = hasImage ? [otherItem] : [item1, item2];
 
     let html = '';
@@ -556,6 +585,11 @@
         }
       }
 
+      // 合理的裁量財の枠は、似せる財の上書きとは独立に、理想の水準へ上書きする
+      if(mandatory && mandatory.overridden && p.id === mandatory.id){
+        overrides = Object.assign({}, overrides, mandatory.overrides);
+      }
+
       grid.appendChild(buildCard(p, { isBase:false, hideImage:hideImage, overrides:overrides }));
     });
 
@@ -577,6 +611,10 @@
           anchorId: anchor.id,
           anchorName: anchor.name,
           anchorScore: bestScore,
+          mandatoryId: mandatory ? mandatory.id : null,
+          mandatoryName: mandatory ? mandatory.name : null,
+          mandatoryOverridden: mandatory ? mandatory.overridden : false,
+          mandatoryChosen: mandatory ? (clickedIdRaw === String(mandatory.id)) : false,
           presentedIds: presented.map(function(p){ return p.id; }),
           commonIds: Array.from(commonSet),
           overrideFields: overrideFields,
@@ -628,10 +666,17 @@
   function submitResults(){
     const round1Payload = {
       slideOrder: round1Records.map(function(r){ return r.size; }),
-      results: {}
+      results: {},
+      mandatory: {}
     };
     round1Records.forEach(function(r){
       round1Payload.results[r.size] = { kept: r.kept, chosenId: r.chosenId, chosenName: r.chosenName };
+      round1Payload.mandatory[r.size] = {
+        mandatoryId: r.mandatoryId,
+        mandatoryName: r.mandatoryName,
+        mandatoryOverridden: r.mandatoryOverridden,
+        mandatoryChosen: r.mandatoryChosen
+      };
     });
 
     const round2Payload = {
@@ -645,6 +690,10 @@
         anchorId: r.anchorId,
         anchorName: r.anchorName,
         anchorScore: r.anchorScore,
+        mandatoryId: r.mandatoryId,
+        mandatoryName: r.mandatoryName,
+        mandatoryOverridden: r.mandatoryOverridden,
+        mandatoryChosen: r.mandatoryChosen,
         commonCount: r.commonIds.length,
         commonIds: r.commonIds,
         presentedIds: r.presentedIds,
