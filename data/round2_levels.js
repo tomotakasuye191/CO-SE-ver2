@@ -322,22 +322,60 @@
     };
   }
 
-  // candidate（またはoverride後の値）が、基準財と比べて item1/item2 のどちらについても
-  // 「悪化していない」かを確認する。水準ベースのスコアだけでは、同じ水準内での
-  // 実際の数値の優劣（例：基準財1,000円 vs 代表値2,000円）を見落とすため、
-  // 数値属性についてはこの実値チェックを別途行う。
-  function noWorseThanBaseOnAttr(good, key, u, candidateRawValue, baseRawValue) {
+  // 属性1つについて、水準の効用に「ごく小さな実値による補正」を加えたスコアを返す。
+  // 同じ水準内であっても、実際の値がより良い方向であれば、ほんの僅かにスコアが高くなる。
+  // これにより「同じ水準に丸められるので見かけ上は同点」という問題を避け、
+  // 実際の数値で見て基準財より優れているかどうかを正しく判定できるようにする。
+  function attrScoreWithTiebreak(good, key, u, rawValue) {
+    var lvl = getLevelIndex(good, key, rawValue);
+    var util = (lvl != null && u[lvl] != null) ? u[lvl] : 0;
     var def = DEFS[good][key];
-    if (!def) return true;
-    if (def.type !== 'numeric' || baseRawValue == null || candidateRawValue == null) return true;
-    var best = bestLevelOf(u);
-    var dir = directionOf(def.ref, best.level);
-    var baseNum = def.parse(baseRawValue);
-    var candNum = def.parse(candidateRawValue);
-    if (baseNum == null || candNum == null) return true;
-    if (dir === 'asc') return candNum <= baseNum + 1e-9;   // 小さいほど良い → 基準財以下でなければNG
-    if (dir === 'desc') return candNum >= baseNum - 1e-9;  // 大きいほど良い → 基準財以上でなければNG
-    return true; // 方向不明な属性はチェックしない
+    if (def && def.type === 'numeric') {
+      var best = bestLevelOf(u);
+      var dir = directionOf(def.ref, best.level);
+      var num = def.parse(rawValue);
+      if (num != null && dir === 'asc') util += -num * 1e-6;
+      if (num != null && dir === 'desc') util += num * 1e-6;
+    }
+    return util;
+  }
+
+  function totalScoreWithTiebreak(good, item1, item2, u1, u2, rawItem1Value, rawItem2Value) {
+    return attrScoreWithTiebreak(good, item1, u1, rawItem1Value) +
+           attrScoreWithTiebreak(good, item2, u2, rawItem2Value);
+  }
+
+  // utils配列の中で、最も効用が低い水準indexを返す（弱める上書き先を決めるのに使う）
+  function worstLevelOf(utils) {
+    if (!utils || !utils.length) return null;
+    var worstIdx = 0, worstVal = Infinity;
+    for (var i = 0; i < utils.length; i++) {
+      if (utils[i] < worstVal) { worstVal = utils[i]; worstIdx = i; }
+    }
+    return worstIdx;
+  }
+
+  // ある財の item1/item2 のどちらかを「基準財より明確に劣る値」に上書きし、
+  // 基準財に対する優位性を確実に消すための上書き値を1つ返す（キーと値のペア）。
+  // 数値属性なら基準財の実値より一歩悪い値、カテゴリ属性なら最も効用の低い水準の代表値にする。
+  function weakenOneAttr(good, key, u, baseItem) {
+    var def = DEFS[good][key];
+    if (!def) return null;
+    if (def.type === 'numeric') {
+      var best = bestLevelOf(u);
+      var dir = directionOf(def.ref, best.level);
+      var baseNum = def.parse(baseItem.attrs[key]);
+      // 数値属性は、弱めた財どうしが同じ値に揃ってしまわないよう、
+      // 「基準財より確実に悪い」範囲(8%〜25%)の中でランダムに幅を持たせる。
+      var margin = 0.08 + Math.random() * 0.17; // 0.08〜0.25
+      if (baseNum != null && dir === 'asc') return baseNum * (1 + margin);  // 小さいほど良い→基準財より大きくする
+      if (baseNum != null && dir === 'desc') return baseNum * (1 - margin); // 大きいほど良い→基準財より小さくする
+      var w = worstLevelOf(u);
+      return w != null ? representativeValue(good, key, w) : baseNum;
+    }
+    // カテゴリ属性（産地など）は水準の代表値しか選べないため、最も効用の低い水準に統一する
+    var w2 = worstLevelOf(u);
+    return w2 != null ? representativeValue(good, key, w2) : null;
   }
 
   // 「基準財より合理的に必ず好ましいはずの財（合理的裁量財）」を求める。
@@ -348,43 +386,74 @@
   // protectedIds: 差し替え対象から除外したいID（アンカーや似せ候補など、他の仕組みと衝突させたくない場合に指定）
   //
   // 戻り値：
-  //   null                      → 基準財の方が理論上のベストより明確に優れている(通常発生しない)ので何もしない
-  //   { id, name, overridden, replace, replaceIndex, overrides? }
+  //   null                      → 基準財の方が理論値より明確に優れている(通常発生しない)ので何もしない
+  //   { id, name, overridden, replace, replaceIndex, overrides?, weakened }
   //     overridden: true なら、presented[replaceIndex] の item1/item2 の表示値を
   //                 overrides の値に書き換えることで「合理的裁量財」を作り出す
   //     replace: true なら、presented[replaceIndex] を replaceWith（プール内の実財）に
   //              まるごと差し替える
   //     replace/overridden いずれも false なら、presented内に既に該当財があるので何もしなくてよい
+  //     weakened: {財ID: {属性キー: 上書き値}} - 基準財より優れてしまっている他の候補財を
+  //               弱めるための上書き。「必ず1つだけ」を守るために使う。
   function findMandatoryItem(good, item1, item2, u1, u2, baseItem, pool, presented, protectedIds) {
     var ideal = idealProfile(good, item1, item2, u1, u2, baseItem);
-    var baseScore = utilFor(good, baseItem, item1, u1) + utilFor(good, baseItem, item2, u2);
-    // 基準財の方が理論値より厳密に上回ることは通常無いが、安全のためのガード。
-    if (ideal.idealScore < baseScore - 1e-9) return null;
 
-    function scoreOf(p) {
-      return utilFor(good, p, item1, u1) + utilFor(good, p, item2, u2);
+    function totalScore(p) {
+      return totalScoreWithTiebreak(good, item1, item2, u1, u2, p.attrs[item1], p.attrs[item2]);
     }
-    // 水準ベースのスコアだけでなく、数値属性の実値でも基準財を下回っていないかを確認する。
-    function dominatesBase(p) {
-      if (scoreOf(p) < ideal.idealScore - 1e-9) return false;
-      if (!noWorseThanBaseOnAttr(good, item1, u1, p.attrs[item1], baseItem.attrs[item1])) return false;
-      if (!noWorseThanBaseOnAttr(good, item2, u2, p.attrs[item2], baseItem.attrs[item2])) return false;
-      return true;
+    var baseScore = totalScore(baseItem);
+    // 理想の上書き値そのものを使って理論上の最良スコアを計算する
+    // （数値属性は基準財の実値も踏まえて押し込んだ値になっているため、
+    //   基準財と同水準でも必ずbaseScoreを上回る）
+    var idealScore = attrScoreWithTiebreak(good, item1, u1, ideal.item1Value) +
+                      attrScoreWithTiebreak(good, item2, u2, ideal.item2Value);
+    if (idealScore < baseScore - 1e-9) return null; // 通常発生しない安全ガード
+
+    // 基準財より明確に優れた財を理論上作れる場合のみ「必ず1つだけ」ルールを適用する
+    // （両属性ともカテゴリで基準財が既に最良＝同点しか作れない場合は、複数の同点を許容する）
+    var strictlyBetterExists = idealScore > baseScore + 1e-9;
+
+    function beatsBase(p) { return totalScore(p) > baseScore + 1e-9; }
+    function tiesOrBeatsBase(p) { return totalScore(p) >= baseScore - 1e-9; }
+    function qualifies(p) { return strictlyBetterExists ? beatsBase(p) : tiesOrBeatsBase(p); }
+
+    var protectedSet = {};
+    (protectedIds || []).forEach(function (id) { protectedSet[String(id)] = true; });
+
+    // 似せる財(commonSet等)やこれから選ぶ合理的裁量財以外で、既に基準財を上回って
+    // しまっている候補を洗い出し、弱める上書きを1属性だけ加えて優位性を消す。
+    function weakenDuplicates(mandatoryIdStr, currentPresented) {
+      var weakened = {};
+      if (!strictlyBetterExists) return weakened;
+      currentPresented.forEach(function (p) {
+        if (protectedSet[String(p.id)]) return;
+        if (String(p.id) === mandatoryIdStr) return;
+        if (!beatsBase(p)) return;
+        var def1 = DEFS[good][item1];
+        var key = (def1 && def1.type === 'numeric') ? item1 : item2;
+        var val = weakenOneAttr(good, key, (key === item1 ? u1 : u2), baseItem);
+        var ov = {};
+        ov[key] = val;
+        weakened[p.id] = ov;
+      });
+      return weakened;
     }
 
-    // 1) 提示予定の候補の中に、理論上の最良スコア（かつ実値でも基準財に劣らない）財が既にあるか
+    // 1) 提示予定の候補の中に、基準財より優れた（strictlyBetterExistsがfalseなら同点でも可）
+    //    財が既にあるか
     var already = null;
     for (var i = 0; i < presented.length; i++) {
       var p = presented[i];
-      if (String(p.id) !== String(baseItem.id) && dominatesBase(p)) { already = p; break; }
+      if (String(p.id) !== String(baseItem.id) && qualifies(p)) { already = p; break; }
     }
     if (already) {
-      return { id: already.id, name: already.name, overridden: false, replace: false };
+      return {
+        id: already.id, name: already.name, overridden: false, replace: false,
+        weakened: weakenDuplicates(String(already.id), presented)
+      };
     }
 
     // 差し替え可能な枠（保護されていない枠）を選ぶ
-    var protectedSet = {};
-    (protectedIds || []).forEach(function (id) { protectedSet[String(id)] = true; });
     var replaceableIdx = [];
     presented.forEach(function (p, idx) { if (!protectedSet[String(p.id)]) replaceableIdx.push(idx); });
     if (!replaceableIdx.length) {
@@ -392,14 +461,20 @@
     }
     var replaceIndex = replaceableIdx[Math.floor(Math.random() * replaceableIdx.length)];
 
-    // 2) プール全体（画面には出ていない財も含む）に、理論上の最良スコアを満たす実財が無いか探す
+    // 2) プール全体（画面には出ていない財も含む）に、条件を満たす実財が無いか探す
     var poolMatch = null;
     for (var j = 0; j < pool.length; j++) {
       var q = pool[j];
-      if (String(q.id) !== String(baseItem.id) && dominatesBase(q)) { poolMatch = q; break; }
+      if (String(q.id) !== String(baseItem.id) && qualifies(q)) { poolMatch = q; break; }
     }
     if (poolMatch) {
-      return { id: poolMatch.id, name: poolMatch.name, overridden: false, replace: true, replaceIndex: replaceIndex, replaceWith: poolMatch };
+      var presentedAfterReplace = presented.slice();
+      presentedAfterReplace[replaceIndex] = poolMatch;
+      return {
+        id: poolMatch.id, name: poolMatch.name, overridden: false, replace: true,
+        replaceIndex: replaceIndex, replaceWith: poolMatch,
+        weakened: weakenDuplicates(String(poolMatch.id), presentedAfterReplace)
+      };
     }
 
     // 3) 実財の中に該当が無ければ、候補1枠の値を理想の水準（＋数値は基準財の実値を踏まえて
@@ -408,7 +483,11 @@
     var overrides = {};
     if (ideal.item1Value != null) overrides[item1] = ideal.item1Value;
     if (ideal.item2Value != null) overrides[item2] = ideal.item2Value;
-    return { id: carrier.id, name: carrier.name, overridden: true, replace: false, replaceIndex: replaceIndex, overrides: overrides };
+    return {
+      id: carrier.id, name: carrier.name, overridden: true, replace: false,
+      replaceIndex: replaceIndex, overrides: overrides,
+      weakened: weakenDuplicates(String(carrier.id), presented)
+    };
   }
 
   global.Round2Levels = {
