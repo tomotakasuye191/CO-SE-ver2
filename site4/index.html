@@ -458,11 +458,13 @@
     // 基準財カード（左固定、実データのまま）
     basePanel.appendChild(buildCard(baseItem, { isBase:true, hideImage:false, overrides:null }));
 
-    // 候補カード（合理的裁量財の枠のみ、必要なら属性値を上書き）
+    // 候補カード（合理的裁量財の枠は理想値に、基準財を上回ってしまう他の候補は弱める）
     presented.forEach(function(p){
       let overrides = null;
       if(mandatory && mandatory.overridden && p.id === mandatory.id){
         overrides = mandatory.overrides;
+      } else if(mandatory && mandatory.weakened && mandatory.weakened[p.id]){
+        overrides = mandatory.weakened[p.id];
       }
       grid.appendChild(buildCard(p, { isBase:false, hideImage:false, overrides:overrides }));
     });
@@ -585,9 +587,13 @@
         }
       }
 
-      // 合理的裁量財の枠は、似せる財の上書きとは独立に、理想の水準へ上書きする
+      // 合理的裁量財の枠は、似せる財の上書きとは独立に、理想の水準へ上書きする。
+      // また、似せる財グループ以外でたまたま基準財を上回ってしまっている財は弱める
+      // （「基準財より好ましい財は必ず1つだけ」を保証するため）。
       if(mandatory && mandatory.overridden && p.id === mandatory.id){
         overrides = Object.assign({}, overrides, mandatory.overrides);
+      } else if(mandatory && mandatory.weakened && mandatory.weakened[p.id]){
+        overrides = Object.assign({}, overrides, mandatory.weakened[p.id]);
       }
 
       grid.appendChild(buildCard(p, { isBase:false, hideImage:hideImage, overrides:overrides }));
