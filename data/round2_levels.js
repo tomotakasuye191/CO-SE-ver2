@@ -439,20 +439,6 @@
       return weakened;
     }
 
-    // 1) 提示予定の候補の中に、基準財より優れた（strictlyBetterExistsがfalseなら同点でも可）
-    //    財が既にあるか
-    var already = null;
-    for (var i = 0; i < presented.length; i++) {
-      var p = presented[i];
-      if (String(p.id) !== String(baseItem.id) && qualifies(p)) { already = p; break; }
-    }
-    if (already) {
-      return {
-        id: already.id, name: already.name, overridden: false, replace: false,
-        weakened: weakenDuplicates(String(already.id), presented)
-      };
-    }
-
     // 差し替え可能な枠（保護されていない枠）を選ぶ
     var replaceableIdx = [];
     presented.forEach(function (p, idx) { if (!protectedSet[String(p.id)]) replaceableIdx.push(idx); });
@@ -461,23 +447,8 @@
     }
     var replaceIndex = replaceableIdx[Math.floor(Math.random() * replaceableIdx.length)];
 
-    // 2) プール全体（画面には出ていない財も含む）に、条件を満たす実財が無いか探す
-    var poolMatch = null;
-    for (var j = 0; j < pool.length; j++) {
-      var q = pool[j];
-      if (String(q.id) !== String(baseItem.id) && qualifies(q)) { poolMatch = q; break; }
-    }
-    if (poolMatch) {
-      var presentedAfterReplace = presented.slice();
-      presentedAfterReplace[replaceIndex] = poolMatch;
-      return {
-        id: poolMatch.id, name: poolMatch.name, overridden: false, replace: true,
-        replaceIndex: replaceIndex, replaceWith: poolMatch,
-        weakened: weakenDuplicates(String(poolMatch.id), presentedAfterReplace)
-      };
-    }
-
-    // 3) 実財の中に該当が無ければ、候補1枠の値を理想の水準（＋数値は基準財の実値を踏まえて
+    // 実在財で条件を満たせるものがあっても使わず、必ず候補1枠の値を理論上の理想値
+    // （＋数値は基準財の実値を踏まえてさらに踏み込んだ値）に書き換えて作り出す
     //    さらに踏み込んだ値）に書き換えて作り出す
     var carrier = presented[replaceIndex];
     var overrides = {};
