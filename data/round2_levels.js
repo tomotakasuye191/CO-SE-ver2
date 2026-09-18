@@ -247,25 +247,33 @@
   }
 
   // 数値属性の「合理的裁量財」用の上書き値を決める。
-  // 単純に水準の代表値を使うのではなく、基準財の実際の値と水準の代表値を比べて
-  // 被験者にとってより有利な方を基準に、そこからさらに20%踏み込んだ値にする。
-  // これにより「基準財が既に水準の代表値より良い実際の値を持っている」場合でも、
-  // 必ず基準財の実際の値より良い数値になることを保証する。
-  function numericOverrideValue(good, key, bestLevelIdx, baseRawValue) {
+  // 単純に水準の代表値を使うのではなく、「水準の代表値」と「必ず上回るべき財
+  // （基準財・アンカーなど）の実際の値」をすべて比べて、被験者にとって最も有利な
+  // ものを基準に、そこからさらに20%踏み込んだ値にする。これにより、基準財だけでなく
+  // アンカー（次点に好ましい財）などの実在財より良い水準の代表値を持っていた場合でも、
+  // 必ずそれら全てより良い数値になることを保証する。
+  // mustBeatRawValues: 上回るべき財の実際の値の配列（null/undefinedは無視される）
+  function numericOverrideValue(good, key, bestLevelIdx, mustBeatRawValues) {
     var def = DEFS[good][key];
     var ref = def.ref;
     var refBest = ref[bestLevelIdx];
-    var baseNum = (baseRawValue != null) ? def.parse(baseRawValue) : null;
     var dir = directionOf(ref, bestLevelIdx);
-    if (dir === 'asc') { // 小さいほど良い
-      var floor = (baseNum != null) ? Math.min(refBest, baseNum) : refBest;
-      return floor * 0.8;
+    var nums = [refBest];
+    (mustBeatRawValues || []).forEach(function (raw) {
+      if (raw == null) return;
+      var n = def.parse(raw);
+      if (n != null) nums.push(n);
+    });
+    var raw;
+    if (dir === 'asc') { // 小さいほど良い→全ての中で最小のものから、さらに20%小さく
+      raw = Math.min.apply(null, nums) * 0.8;
+      return Math.max(0, Math.ceil(raw));
     }
-    if (dir === 'desc') { // 大きいほど良い
-      var ceil = (baseNum != null) ? Math.max(refBest, baseNum) : refBest;
-      return ceil * 1.2;
+    if (dir === 'desc') { // 大きいほど良い→全ての中で最大のものから、さらに20%大きく
+      raw = Math.max.apply(null, nums) * 1.2;
+      return Math.ceil(raw);
     }
-    return refBest; // 真ん中の水準がベスト：方向が決められないので代表値のまま
+    return Math.ceil(refBest); // 真ん中の水準がベスト：方向が決められないので代表値のまま
   }
 
   // ---- メイン関数 ----------------------------------------------------------
@@ -296,8 +304,10 @@
 
   // 「基準財より合理的に必ず好ましいはずの財（合理的裁量財）」を組み立てるための
   // 理論上の最良スコア・水準・上書き値をまとめて返す。
-  // baseItem を渡すことで、数値属性は「基準財の実際の値」も踏まえて上書き値を決める。
-  function idealProfile(good, item1, item2, u1, u2, baseItem) {
+  // mustBeatItems（基準財・アンカーなど、必ず上回るべき財の配列）を渡すことで、
+  // 数値属性はそれら全ての実際の値も踏まえて上書き値を決める。
+  function idealProfile(good, item1, item2, u1, u2, mustBeatItems) {
+    var items = mustBeatItems || [];
     var b1 = bestLevelOf(u1);
     var b2 = bestLevelOf(u2);
     var def1 = DEFS[good][item1];
@@ -305,12 +315,12 @@
     var item1Value = null, item2Value = null;
     if (b1.level != null) {
       item1Value = (def1 && def1.type === 'numeric')
-        ? numericOverrideValue(good, item1, b1.level, baseItem ? baseItem.attrs[item1] : null)
+        ? numericOverrideValue(good, item1, b1.level, items.map(function (it) { return it ? it.attrs[item1] : null; }))
         : representativeValue(good, item1, b1.level);
     }
     if (b2.level != null) {
       item2Value = (def2 && def2.type === 'numeric')
-        ? numericOverrideValue(good, item2, b2.level, baseItem ? baseItem.attrs[item2] : null)
+        ? numericOverrideValue(good, item2, b2.level, items.map(function (it) { return it ? it.attrs[item2] : null; }))
         : representativeValue(good, item2, b2.level);
     }
     return {
@@ -368,10 +378,16 @@
       // 数値属性は、弱めた財どうしが同じ値に揃ってしまわないよう、
       // 「基準財より確実に悪い」範囲(8%〜25%)の中でランダムに幅を持たせる。
       var margin = 0.08 + Math.random() * 0.17; // 0.08〜0.25
-      if (baseNum != null && dir === 'asc') return baseNum * (1 + margin);  // 小さいほど良い→基準財より大きくする
-      if (baseNum != null && dir === 'desc') return baseNum * (1 - margin); // 大きいほど良い→基準財より小さくする
+      if (baseNum != null && dir === 'asc') {
+        var up = Math.ceil(baseNum * (1 + margin));
+        return up <= baseNum ? Math.ceil(baseNum) + 1 : up; // 小さいほど良い→基準財より大きくする
+      }
+      if (baseNum != null && dir === 'desc') {
+        var down = Math.ceil(baseNum * (1 - margin));
+        return down >= baseNum ? Math.max(0, baseNum - 1) : down; // 大きいほど良い→基準財より小さくする
+      }
       var w = worstLevelOf(u);
-      return w != null ? representativeValue(good, key, w) : baseNum;
+      return w != null ? Math.ceil(representativeValue(good, key, w)) : (baseNum != null ? Math.ceil(baseNum) : null);
     }
     // カテゴリ属性（産地など）は水準の代表値しか選べないため、最も効用の低い水準に統一する
     var w2 = worstLevelOf(u);
@@ -395,15 +411,20 @@
   //     replace/overridden いずれも false なら、presented内に既に該当財があるので何もしなくてよい
   //     weakened: {財ID: {属性キー: 上書き値}} - 基準財より優れてしまっている他の候補財を
   //               弱めるための上書き。「必ず1つだけ」を守るために使う。
-  function findMandatoryItem(good, item1, item2, u1, u2, baseItem, pool, presented, protectedIds) {
-    var ideal = idealProfile(good, item1, item2, u1, u2, baseItem);
+  //
+  // anchorItem: 「次点に好ましい財」など、合理的裁量財が絶対に上回るべき、もう1つの
+  //             実在財（ラウンド2のアンカー等）。無ければ null / 省略可。
+  function findMandatoryItem(good, item1, item2, u1, u2, baseItem, pool, presented, protectedIds, anchorItem) {
+    var mustBeatItems = [baseItem];
+    if (anchorItem) mustBeatItems.push(anchorItem);
+    var ideal = idealProfile(good, item1, item2, u1, u2, mustBeatItems);
 
     function totalScore(p) {
       return totalScoreWithTiebreak(good, item1, item2, u1, u2, p.attrs[item1], p.attrs[item2]);
     }
     var baseScore = totalScore(baseItem);
     // 理想の上書き値そのものを使って理論上の最良スコアを計算する
-    // （数値属性は基準財の実値も踏まえて押し込んだ値になっているため、
+    // （数値属性は基準財・アンカー双方の実値も踏まえて押し込んだ値になっているため、
     //   基準財と同水準でも必ずbaseScoreを上回る）
     var idealScore = attrScoreWithTiebreak(good, item1, u1, ideal.item1Value) +
                       attrScoreWithTiebreak(good, item2, u2, ideal.item2Value);
