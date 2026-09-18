@@ -331,8 +331,34 @@
 
   function attrValue(product, key){ return product.attrs[key]; }
   function formatValue(key, val){
-    if(key === 'price') return '¥' + Number(val).toLocaleString();
-    if(key === 'abv') return val + '%';
+    // 上書き(overrides)された数値は元データの単位が失われているため、
+    // ここで属性ごとの単位を付け直し、かつ小数点以下は切り上げて整数にする
+    // （被験者から見て、実在財かどうかで数値の見た目に違いが出ないようにするため）。
+    if(key === 'price'){
+      return '¥' + Math.ceil(Number(val)).toLocaleString('ja-JP');
+    }
+    if(key === 'abv'){
+      return Math.ceil(Number(val)) + '%';
+    }
+    if(key === 'cacao_percent'){
+      const n = (typeof val === 'number') ? val : parseFloat(val);
+      return isNaN(n) ? val : (Math.ceil(n) + '%');
+    }
+    if(key === 'calorie'){
+      if(typeof val === 'number') return Math.ceil(val) + 'kcal';
+      return val; // 元々「○○kcal（△△あたり）」という文字列ならそのまま
+    }
+    if(key === 'volume'){
+      if(typeof val === 'number'){
+        const unit = (good === 'rice') ? 'kg' : 'g';
+        return Math.ceil(val) + unit;
+      }
+      return val;
+    }
+    if(key === 'expiry'){
+      if(typeof val === 'number') return '製造から' + Math.ceil(val) + '日';
+      return val;
+    }
     return val;
   }
 
@@ -542,7 +568,7 @@
     let mandatory = null;
     if(u1 && u2 && window.Round2Levels){
       const protectedIds = Array.from(commonSet);
-      mandatory = window.Round2Levels.findMandatoryItem(good, item1, item2, u1, u2, baseItem, pool2, presented, protectedIds);
+      mandatory = window.Round2Levels.findMandatoryItem(good, item1, item2, u1, u2, baseItem, pool2, presented, protectedIds, anchor);
       if(mandatory && mandatory.replace){
         presented[mandatory.replaceIndex] = mandatory.replaceWith;
       }
