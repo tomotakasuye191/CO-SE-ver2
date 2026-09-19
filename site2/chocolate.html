@@ -403,16 +403,16 @@
    ========================================================================= */
 
 // 属性の並び順（内部キー）。以降のデータ配列はすべてこの順で並んでいる。
-const ATTRS = ['price', 'cacao', 'effect', 'cal', 'fairtrade'];
+const ATTRS = ['price', 'cacao', 'trait', 'cal', 'fairtrade'];
 
 // 各属性の水準数（価格・カカオ量・効果・カロリーは3水準、フェアトレードは2水準）
-const ATTR_LEVELS = { price: 3, cacao: 3, effect: 3, cal: 3, fairtrade: 2 };
+const ATTR_LEVELS = { price: 3, cacao: 3, trait: 3, cal: 3, fairtrade: 2 };
 
 // 各属性の水準ラベル（表示用）
 const LEVEL_LABELS = {
   price:      ["100円", "200円", "300円"],
   cacao:      ["30%", "50%", "70%"],
-  effect:     ["集中力が上がる", "睡眠を助ける", "特にない"],
+  trait:     ["集中力が上がる", "睡眠を助ける", "効果なし"],
   cal:        ["150kcal", "250kcal", "350kcal"],
   fairtrade:  ["なし", "あり"],
 };
@@ -570,13 +570,13 @@ function computeImportance(beta) {
 const ATTRIBUTE_LABELS = {
   price:      '価格',
   cacao:      'カカオ量',
-  effect:     '特定の効果の有無',
+  trait:     '特定の効果の有無',
   cal:        'カロリー',
   fairtrade:  'フェアトレード',
 };
 
 // 重視度が同点だった場合のタイブレーク優先順位（先頭ほど優先度が高い）
-const ATTRIBUTE_PRIORITY = ['price', 'cacao', 'effect', 'cal', 'fairtrade'];
+const ATTRIBUTE_PRIORITY = ['price', 'cacao', 'trait', 'cal', 'fairtrade'];
 
 // 上位2属性の組み合わせ名（5C2=10通り）。キーは ATTRIBUTE_PRIORITY 順で正規化した「属性1+属性2」。
 const TYPE_NAMES_15 = {
@@ -627,10 +627,17 @@ function buildRedirectUrl(typeResult) {
   typeResult.ranking.forEach(function(r){ rankingByAttr[r.attr] = r; });
   const u1 = rankingByAttr[key1].utils; // 例：ワイン価格なら[水準0,水準1,水準2]の効用
   const u2 = rankingByAttr[key2].utils;
+  // 基準財の抽選（好ましい順にランク付けして中央順位を選ぶ）のため、
+  // 全5属性の水準別効用値を、実商品の属性キー(ATTR_KEY_MAP変換後)をキーにしてまとめて渡す。
+  const allUtils = {};
+  typeResult.ranking.forEach(function(r){
+    const ourKey = ATTR_KEY_MAP[r.attr];
+    if(ourKey) allUtils[ourKey] = r.utils;
+  });
   const params = new URLSearchParams({
     id: SYS.id, group: SYS.group, good1: SYS.good1, good2: SYS.good2, current: SYS.current,
     good: GOOD_CODE, item1: ourKey1, item2: ourKey2, gender: SYS.gender, age: SYS.age,
-    u1: u1.join(','), u2: u2.join(',')
+    u1: u1.join(','), u2: u2.join(','), au: JSON.stringify(allUtils)
   });
   return BASE_URL + "site4/index.html?" + params.toString();
 }
@@ -650,7 +657,7 @@ const BASE_URL = "https://tomotakasuye191.github.io/CO-SE-ver2/";
 const GOOD_CODE = "chocolate"; // このツール自体が担当する財の内部コード
 
 // このツールの属性キー ⇔ サイト4側の属性キーの対応表
-const ATTR_KEY_MAP = {"price": "price", "cacao": "cacao_percent", "effect": "effect", "cal": "calorie", "fairtrade": "fairtrade"};
+const ATTR_KEY_MAP = {"price": "price", "cacao": "cacao_percent", "trait": "trait", "cal": "calorie", "fairtrade": "fairtrade"};
 
 // URLパラメータから、サイト1/サイト4から引き継いだ情報を読み取る
 const SYS_PARAMS = new URLSearchParams(window.location.search);
