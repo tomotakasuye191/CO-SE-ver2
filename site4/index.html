@@ -364,7 +364,14 @@
     const rank = MID_RANK[size];
     const base = ranked[rank - 1];
     const candidates = shuffle(ranked.filter(function(p){ return p.id !== base.id; }));
-    return { base: base, candidates: candidates };
+    return { base: base, candidates: candidates, ranked: ranked };
+  }
+
+  // rankedList（好ましい順、1位が先頭）の中で、指定したIDが何位だったかを返す（1始まり）。
+  // 見つからなければnull。
+  function rankOf(rankedList, id){
+    const idx = rankedList.findIndex(function(p){ return String(p.id) === String(id); });
+    return idx === -1 ? null : idx + 1;
   }
 
   function attrValue(product, key){ return product.attrs[key]; }
@@ -515,6 +522,9 @@
           size: size,
           baseId: baseItem.id,
           baseName: baseItem.name,
+          baseRank: MID_RANK[size],
+          totalRanked: size + 1,
+          chosenRank: rankOf(picked.ranked, clickedId),
           presentedIds: presented.map(function(p){ return p.id; }),
           mandatoryId: mandatory ? mandatory.id : null,
           mandatoryName: mandatory ? mandatory.name : null,
@@ -656,6 +666,9 @@
           size: size,
           baseId: baseItem.id,
           baseName: baseItem.name,
+          baseRank: MID_RANK[size],
+          totalRanked: size + 1,
+          chosenRank: rankOf(picked.ranked, kept ? baseItem.id : clickedIdRaw),
           anchorId: anchor.id,
           anchorName: anchor.name,
           anchorScore: bestScore,
@@ -719,14 +732,14 @@
       base: {}
     };
     round1Records.forEach(function(r){
-      round1Payload.results[r.size] = { kept: r.kept, chosenId: r.chosenId, chosenName: r.chosenName };
+      round1Payload.results[r.size] = { kept: r.kept, chosenId: r.chosenId, chosenName: r.chosenName, chosenRank: r.chosenRank, totalRanked: r.totalRanked };
       round1Payload.mandatory[r.size] = {
         mandatoryId: r.mandatoryId,
         mandatoryName: r.mandatoryName,
         mandatoryOverridden: r.mandatoryOverridden,
         mandatoryChosen: r.mandatoryChosen
       };
-      round1Payload.base[r.size] = { baseId: r.baseId, baseName: r.baseName };
+      round1Payload.base[r.size] = { baseId: r.baseId, baseName: r.baseName, baseRank: r.baseRank };
     });
 
     const round2Payload = {
@@ -736,7 +749,7 @@
       base: {}
     };
     round2Records.forEach(function(r){
-      round2Payload.results[r.size] = { kept: r.kept, chosenId: r.chosenId, chosenName: r.chosenName };
+      round2Payload.results[r.size] = { kept: r.kept, chosenId: r.chosenId, chosenName: r.chosenName, chosenRank: r.chosenRank, totalRanked: r.totalRanked };
       round2Payload.commonality[r.size] = {
         anchorId: r.anchorId,
         anchorName: r.anchorName,
@@ -750,7 +763,7 @@
         presentedIds: r.presentedIds,
         overrideFields: r.overrideFields
       };
-      round2Payload.base[r.size] = { baseId: r.baseId, baseName: r.baseName };
+      round2Payload.base[r.size] = { baseId: r.baseId, baseName: r.baseName, baseRank: r.baseRank };
     });
 
     const payload = {
