@@ -524,7 +524,9 @@
           baseName: baseItem.name,
           baseRank: MID_RANK[size],
           totalRanked: size + 1,
-          chosenRank: rankOf(picked.ranked, clickedId),
+          chosenRank: (mandatory && mandatory.overridden && String(clickedId) === String(mandatory.id))
+            ? 1
+            : rankOf(picked.ranked, clickedId),
           presentedIds: presented.map(function(p){ return p.id; }),
           mandatoryId: mandatory ? mandatory.id : null,
           mandatoryName: mandatory ? mandatory.name : null,
@@ -668,7 +670,9 @@
           baseName: baseItem.name,
           baseRank: MID_RANK[size],
           totalRanked: size + 1,
-          chosenRank: rankOf(picked.ranked, kept ? baseItem.id : clickedIdRaw),
+          chosenRank: (mandatory && mandatory.overridden && !kept && clickedIdRaw === String(mandatory.id))
+            ? 1
+            : rankOf(picked.ranked, kept ? baseItem.id : clickedIdRaw),
           anchorId: anchor.id,
           anchorName: anchor.name,
           anchorScore: bestScore,
