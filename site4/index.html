@@ -524,9 +524,7 @@
           baseName: baseItem.name,
           baseRank: MID_RANK[size],
           totalRanked: size + 1,
-          chosenRank: (mandatory && mandatory.overridden && String(clickedId) === String(mandatory.id))
-            ? 1
-            : rankOf(picked.ranked, clickedId),
+          chosenRank: rankOf(picked.ranked, clickedId),
           presentedIds: presented.map(function(p){ return p.id; }),
           mandatoryId: mandatory ? mandatory.id : null,
           mandatoryName: mandatory ? mandatory.name : null,
@@ -558,46 +556,68 @@
     renderRound2Slide(size);
   }
 
-  // 提示候補1件のスコア（重要視2項目の水準別効用値の合計）を計算する。
-  // 対応する水準が無い属性は寄与0として扱う。
-  function candidateScore(p){
-    return window.Round2Levels.utilFor(good, p, item1, u1) +
-           window.Round2Levels.utilFor(good, p, item2, u2);
+  // 「絶対に好ましい財」に似せる財を選ぶ際、重要視2項目(item1/item2)以外の属性が
+  // できるだけばらけるように選ぶ。他の属性の値の組み合わせ（シグネチャ）が異なる財を
+  // 優先的に選び、種類が尽きたら重複を許可する。
+  function otherAttrsSignature(product, otherKeys){
+    return otherKeys.map(function(k){ return String(product.attrs[k]); }).join('|');
+  }
+  function pickDiverseCandidates(candidates, count, otherKeys){
+    const groups = {};
+    candidates.forEach(function(p){
+      const sig = otherAttrsSignature(p, otherKeys);
+      if(!groups[sig]) groups[sig] = [];
+      groups[sig].push(p);
+    });
+    const sigKeys = shuffle(Object.keys(groups));
+    sigKeys.forEach(function(k){ groups[k] = shuffle(groups[k]); });
+    const picked = [];
+    let idx = 0;
+    while(picked.length < count){
+      let anyAdded = false;
+      for(let i = 0; i < sigKeys.length && picked.length < count; i++){
+        const g = groups[sigKeys[i]];
+        if(g.length > idx){ picked.push(g[idx]); anyAdded = true; }
+      }
+      idx++;
+      if(!anyAdded) break; // 候補が尽きた
+    }
+    return picked;
   }
 
   function renderRound2Slide(size){
     // 候補は「2回目CO用の新20商品」から出す。
-    // ラウンド1の結果は使わない：この被験者のコンジョイント結果（重要視2項目の
-    // 水準別効用値）から見て、提示候補の中で最もスコアが高い財＝「合理的なら必ず
-    // 選ぶはずの財」を求め、これを「次点に好ましい財」としてアンカー（似せる基準）にする。
+    // 「次点に好ましい財(アンカー)」の仕組みは廃止。代わりに、重要視2項目の効用値から
+    // 「絶対に好ましい財」（基準財より必ず好ましいはずの財）を1つ作り、それに重要視2項目を
+    // 揃えた「似せた財」を、これまでのcommonCountの数だけ追加で用意する。
     const pool2 = window.PRODUCTS_ROUND2[good].slice();
     const picked = pickBaseAndCandidates(pool2, size);
     const baseItem = picked.base;
     const presented = picked.candidates;
 
-    let bestScore = -Infinity, bestCandidates = [];
-    presented.forEach(function(p){
-      const s = candidateScore(p);
-      if(s > bestScore){ bestScore = s; bestCandidates = [p]; }
-      else if(s === bestScore){ bestCandidates.push(p); }
-    });
-    // 同点の場合はランダムに1つを選ぶ
-    const anchor = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
-    const sourceItem = anchor;
-
-    const commonCount = COMMON_COUNT[size];
-    const restForCommon = presented.filter(function(p){ return p.id !== anchor.id; });
-    const commonSet = new Set([anchor.id].concat(sampleN(restForCommon, commonCount - 1).map(function(p){ return p.id; })));
-
-    // 「合理的裁量財」：基準財より合理的に必ず好ましいはずの財を、
-    // アンカー・似せた財(commonSet)の枠とは完全に別の枠に必ず1つ含める。
+    // 「絶対に好ましい財」：基準財より合理的に必ず好ましいはずの財を1つ作る。
     let mandatory = null;
     if(u1 && u2 && window.Round2Levels){
-      const protectedIds = Array.from(commonSet);
-      mandatory = window.Round2Levels.findMandatoryItem(good, item1, item2, u1, u2, baseItem, pool2, presented, protectedIds, anchor);
+      mandatory = window.Round2Levels.findMandatoryItem(good, item1, item2, u1, u2, baseItem, pool2, presented, []);
       if(mandatory && mandatory.replace){
         presented[mandatory.replaceIndex] = mandatory.replaceWith;
       }
+    }
+    const mandatoryCardId = mandatory ? presented[mandatory.replaceIndex].id : null;
+
+    // 「絶対に好ましい財」に、重要視2項目(item1/item2)を揃えた財を、
+    // これまでのcommonCountの数（本体1個含む）だけ用意する。
+    // それ以外の属性はできるだけばらけるように選ぶ。
+    const commonCount = COMMON_COUNT[size];
+    let commonSet = new Set();
+    let similarIds = [];
+    if(mandatory){
+      commonSet.add(mandatoryCardId);
+      const otherKeys = fieldDefs.map(function(pair){ return pair[0]; }).filter(function(k){ return k !== item1 && k !== item2; });
+      const eligible = presented.filter(function(p){ return p.id !== mandatoryCardId; });
+      const similarPicked = pickDiverseCandidates(eligible, commonCount - 1, otherKeys);
+      similarPicked.forEach(function(p){ commonSet.add(p.id); });
+      similarIds = similarPicked.map(function(p){ return p.id; });
     }
 
     const overrideFields = hasImage ? [otherItem] : [item1, item2];
@@ -620,35 +640,22 @@
     basePanel.appendChild(buildCard(baseItem, { isBase:true, hideImage:false, overrides:null }));
 
     presented.forEach(function(p){
-      const isCommon = commonSet.has(p.id);
-      const isSourceItself = (p.id === anchor.id);
-      let hideImage = false;
       let overrides = null;
 
-      if(hasImage){
-        hideImage = !isCommon; // アンカー(または似せた財)のみ画像表示
-        if(isCommon && !isSourceItself && otherItem){
-          overrides = {};
-          overrides[otherItem] = attrValue(sourceItem, otherItem);
-        }
-      } else {
-        if(isCommon && !isSourceItself){
-          overrides = {};
-          overrides[item1] = attrValue(sourceItem, item1);
-          overrides[item2] = attrValue(sourceItem, item2);
-        }
-      }
-
-      // 合理的裁量財の枠は、似せる財の上書きとは独立に、理想の水準へ上書きする。
-      // また、似せる財グループ以外でたまたま基準財を上回ってしまっている財は弱める
-      // （「基準財より好ましい財は必ず1つだけ」を保証するため）。
-      if(mandatory && mandatory.overridden && p.id === mandatory.id){
-        overrides = Object.assign({}, overrides, mandatory.overrides);
+      if(mandatory && mandatory.overridden && p.id === mandatoryCardId){
+        // 絶対に好ましい財(本体)：理想の水準へ上書きする
+        overrides = mandatory.overrides;
+      } else if(similarIds.indexOf(p.id) !== -1){
+        // 絶対に好ましい財に似せた財：重要視2項目だけを本体と同じ値に揃える
+        overrides = {};
+        overrides[item1] = mandatory.overrides[item1];
+        overrides[item2] = mandatory.overrides[item2];
       } else if(mandatory && mandatory.weakened && mandatory.weakened[p.id]){
-        overrides = Object.assign({}, overrides, mandatory.weakened[p.id]);
+        // 似せた財グループ以外でたまたま基準財を上回ってしまっている財は弱める
+        overrides = mandatory.weakened[p.id];
       }
 
-      grid.appendChild(buildCard(p, { isBase:false, hideImage:hideImage, overrides:overrides }));
+      grid.appendChild(buildCard(p, { isBase:false, hideImage:false, overrides:overrides }));
     });
 
     const clickable = Array.from(basePanel.children).concat(Array.from(grid.children));
@@ -673,13 +680,11 @@
           chosenRank: (mandatory && mandatory.overridden && !kept && clickedIdRaw === String(mandatory.id))
             ? 1
             : rankOf(picked.ranked, kept ? baseItem.id : clickedIdRaw),
-          anchorId: anchor.id,
-          anchorName: anchor.name,
-          anchorScore: bestScore,
           mandatoryId: mandatory ? mandatory.id : null,
           mandatoryName: mandatory ? mandatory.name : null,
           mandatoryOverridden: mandatory ? mandatory.overridden : false,
           mandatoryChosen: mandatory ? (clickedIdRaw === String(mandatory.id)) : false,
+          similarIds: similarIds,
           presentedIds: presented.map(function(p){ return p.id; }),
           commonIds: Array.from(commonSet),
           overrideFields: overrideFields,
@@ -755,13 +760,11 @@
     round2Records.forEach(function(r){
       round2Payload.results[r.size] = { kept: r.kept, chosenId: r.chosenId, chosenName: r.chosenName, chosenRank: r.chosenRank, totalRanked: r.totalRanked };
       round2Payload.commonality[r.size] = {
-        anchorId: r.anchorId,
-        anchorName: r.anchorName,
-        anchorScore: r.anchorScore,
         mandatoryId: r.mandatoryId,
         mandatoryName: r.mandatoryName,
         mandatoryOverridden: r.mandatoryOverridden,
         mandatoryChosen: r.mandatoryChosen,
+        similarIds: r.similarIds,
         commonCount: r.commonIds.length,
         commonIds: r.commonIds,
         presentedIds: r.presentedIds,
