@@ -383,22 +383,22 @@ const SYS = {
   good2: SYS_PARAMS.get('good2') || '',
   gender: SYS_PARAMS.get('gender') || '',
   age: SYS_PARAMS.get('age') || '',
-  qseq: SYS_PARAMS.get('qseq') || '1', // 知識アンケート2財分のうち、1つ目か2つ目か
+  current: SYS_PARAMS.get('current') || '1', // どちらの財のCO直後のアンケートか（1 or 2）
 };
 
 // GASのコールドスタート対策：ページを開いた時点で軽く一度呼んでおく（結果は使わない）
 try { fetch(GAS_URL, { method: 'GET', mode: 'no-cors' }).catch(function(){}); } catch(e) {}
 
 function buildNextUrl() {
-  if (SYS.qseq === '1') {
-    // 財1の知識アンケートが終わった → 続けて財2の知識アンケートへ
+  if (SYS.current === '1') {
+    // 財1のCO・アンケートが終わった → 財2のコンジョイント(site2)へ
     const params = new URLSearchParams({
       id: SYS.id, group: SYS.group, good1: SYS.good1, good2: SYS.good2,
-      gender: SYS.gender, age: SYS.age, qseq: '2'
+      current: '2', gender: SYS.gender, age: SYS.age
     });
-    return BASE_URL + 'site5/' + SYS.good2 + '.html?' + params.toString();
+    return BASE_URL + 'site2/' + SYS.good2 + '.html?' + params.toString();
   } else {
-    // 財2の知識アンケートも終わった → 実験は全て終了
+    // 財2のCO・アンケートも終わった → 実験は全て終了
     const params = new URLSearchParams({ id: SYS.id });
     return BASE_URL + 'complete/index.html?' + params.toString();
   }
