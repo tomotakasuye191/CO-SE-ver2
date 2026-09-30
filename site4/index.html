@@ -826,13 +826,13 @@
 
   function goToNext(){
     if(current === '1'){
-      // 1財目のCOが終わった → 実験中は知識アンケードを挟まず、そのまま2財目のコンジョイントへ
-      const query = new URLSearchParams({ id:id, group:group, good1:good1, good2:good2, current:'2', gender:gender, age:age });
-      window.location.href = BASE_URL + 'site2/' + good2 + '.html?' + query.toString();
-    } else {
-      // 2財目のCOも終わった → ここで初めて、2財分の知識アンケードをまとめて実施する（財1から開始）
-      const query = new URLSearchParams({ id:id, group:group, good1:good1, good2:good2, gender:gender, age:age, qseq:'1' });
+      // 1財目のCOが終わった → まず1財目の知識アンケートへ（このアンケートの後、site5側で2財目のコンジョイントへ進む）
+      const query = new URLSearchParams({ id:id, group:group, good1:good1, good2:good2, current:'1', gender:gender, age:age });
       window.location.href = BASE_URL + 'site5/' + good1 + '.html?' + query.toString();
+    } else {
+      // 2財目のCOも終わった → 2財目の知識アンケートへ（このアンケートの後、site5側で完了ページへ進む）
+      const query = new URLSearchParams({ id:id, group:group, good1:good1, good2:good2, current:'2', gender:gender, age:age });
+      window.location.href = BASE_URL + 'site5/' + good2 + '.html?' + query.toString();
     }
   }
 
