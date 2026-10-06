@@ -410,7 +410,18 @@
   // ---- 状態 ----
   // baseItemはこれまでのように固定ではなく、ラウンド1・ラウンド2それぞれのスライド
   // （サイズ5/10/15/20）ごとに毎回新しく抽選される。
-  let round1Pool = products;    // CO1回目の候補母集団（全財）
+  // 2回目COの「候補20個」の画面は、プールが20財しかなく、(候補数+1)=21財の抽選に1財足りない。
+  // その不足を補うため、被験者ごとに1財を取り分け、1回目COの抽選から除外しておく。
+  // （1回目を始める前に除外するので、この財は1回目で必ず被験者に見せていない。）
+  // 取り分けの候補は、元の21商品（IDが1〜21）のうち、2回目の商品と同じ商品・同じ産地の別ボトルで
+  // 紛らわしいもの、写真が商品単体でないものを除いたもの。
+  const RESERVE_EXCLUDE = { yogurt:[1,19,21], rice:[1], wine:[4,21], chocolate:[10] };
+  const reserveCandidates = products.filter(function(p){
+    return p.id <= 21 && (RESERVE_EXCLUDE[good] || []).indexOf(p.id) === -1;
+  });
+  const reservedItem = reserveCandidates[Math.floor(Math.random() * reserveCandidates.length)];
+
+  let round1Pool = products.filter(function(p){ return p.id !== reservedItem.id; }); // CO1回目の候補母集団（取り分けた1財を除く）
   let remainingSizes = [];      // ラウンド1の残りサイズ
   let round1Records = [];       // {size, baseId, baseName, presentedIds, kept, chosenId, chosenName, ...}
   let remainingSizes2 = [];     // ラウンド2の残りサイズ
@@ -591,6 +602,9 @@
     // 「絶対に好ましい財」（基準財より必ず好ましいはずの財）を1つ作り、それに重要視2項目を
     // 揃えた「似せた財」を、これまでのcommonCountの数だけ追加で用意する。
     const pool2 = window.PRODUCTS_ROUND2[good].slice();
+    // 抽選に必要な(候補数+1)財に足りない場合（候補20個の画面）だけ、1回目で見せていない取り分けの財を補う
+    const usedReserve = (pool2.length < size + 1);
+    if(usedReserve){ pool2.push(reservedItem); }
     const picked = pickBaseAndCandidates(pool2, size);
     const baseItem = picked.base;
     const presented = picked.candidates;
@@ -685,6 +699,9 @@
           mandatoryOverridden: mandatory ? mandatory.overridden : false,
           mandatoryChosen: mandatory ? (clickedIdRaw === String(mandatory.id)) : false,
           similarIds: similarIds,
+          reservedId: reservedItem.id,
+          reservedName: reservedItem.name,
+          reservedUsed: usedReserve,
           presentedIds: presented.map(function(p){ return p.id; }),
           commonIds: Array.from(commonSet),
           overrideFields: overrideFields,
@@ -765,6 +782,9 @@
         mandatoryOverridden: r.mandatoryOverridden,
         mandatoryChosen: r.mandatoryChosen,
         similarIds: r.similarIds,
+        reservedId: r.reservedId,
+        reservedName: r.reservedName,
+        reservedUsed: r.reservedUsed,
         commonCount: r.commonIds.length,
         commonIds: r.commonIds,
         presentedIds: r.presentedIds,
