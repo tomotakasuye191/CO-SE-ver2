@@ -786,9 +786,16 @@
     sendCOPayload(payload);
   }
 
-  function sendCOPayload(payload, isAutoRetry){
+  // 通信エラー・サーバーエラーいずれの場合も、間隔を空けながら自動で複数回リトライする。
+  // 1,2,4,8,16秒間隔で最大5回自動リトライし、それでも失敗した場合だけ手動リトライの
+  // ボタンを表示する（「Load failed」等、モバイル回線特有の一時的な通信断に強くするため）。
+  const CO_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 16000];
+
+  function sendCOPayload(payload, attempt){
+    attempt = attempt || 0;
+    const attemptLabel = attempt > 0 ? '（自動再送信 ' + attempt + '/' + CO_RETRY_DELAYS_MS.length + ' 回目…）' : '';
     app.innerHTML =
-      '<div class="loading-screen"><div class="spinner"></div><p>結果を記録しています…</p></div>';
+      '<div class="loading-screen"><div class="spinner"></div><p>結果を記録しています…' + attemptLabel + '</p></div>';
 
     fetch(GAS_URL, {
       method: 'POST',
@@ -807,21 +814,27 @@
       })
       .then(function(data){
         if(data.status !== 'ok'){
-          fail((data.message || '記録に失敗しました。') + '（回答データは保存されているので、再送信できます）',
-               function(){ sendCOPayload(payload); });
+          retryOrFail(payload, attempt, (data.message || '記録に失敗しました。'));
           return;
         }
         sessionStorage.removeItem('experiment_pendingCO_' + good);
         goToNext();
       }).catch(function(err){
-        if(!isAutoRetry){
-          // 1回だけ自動で再試行してから、ユーザーにエラーを見せる
-          setTimeout(function(){ sendCOPayload(payload, true); }, 800);
-          return;
-        }
-        fail('通信エラーが発生しました：' + err.message + '<br>回答データは保存されているので、再送信できます。',
-             function(){ sendCOPayload(payload); });
+        retryOrFail(payload, attempt, '通信エラーが発生しました：' + err.message);
       });
+  }
+
+  function retryOrFail(payload, attempt, message){
+    if(attempt < CO_RETRY_DELAYS_MS.length){
+      const delay = CO_RETRY_DELAYS_MS[attempt];
+      app.innerHTML =
+        '<div class="loading-screen"><div class="spinner"></div><p>' + escapeHtml(message) +
+        '<br>' + Math.round(delay / 1000) + '秒後に自動で再送信します…</p></div>';
+      setTimeout(function(){ sendCOPayload(payload, attempt + 1); }, delay);
+      return;
+    }
+    fail(message + '<br>回答データは保存されているので、再送信できます。',
+         function(){ sendCOPayload(payload, 0); });
   }
 
   function goToNext(){
