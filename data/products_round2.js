@@ -136,13 +136,13 @@ window.PRODUCTS_ROUND2 = {
     {
       "id": "b12",
       "image": "yogurt/b12.jpg",
-      "name": "安曇野食品工房 家族の贅沢 プレーンヨーグルト",
+      "name": "すっぱくない カスタードバニラ ヨーグルト",
       "attrs": {
-        "price": 260,
-        "volume": "400g",
-        "expiry": "製造から15日",
-        "nutrition": "たんぱく質3.6g/脂質3.6g/炭水化物5.3g/食塩相当量0.14g",
-        "calorie": "70kcal（100gあたり）"
+        "price": 108,
+        "volume": "80g",
+        "expiry": "製造から16日",
+        "nutrition": "たんぱく質2.6g/脂質2.0g/炭水化物12.0g/食塩相当量0.08g",
+        "calorie": "76kcal（1個(80g)当たり）"
       }
     },
     {
@@ -734,7 +734,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 210,
         "cacao_percent": "32%",
-        "effect": "集中力が上がる",
+        "trait": "集中力が上がる",
         "calorie": "279kcal（1箱(45g)当たり）",
         "fairtrade": "無"
       }
@@ -746,7 +746,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 150,
         "cacao_percent": "30%",
-        "effect": "睡眠を助ける",
+        "trait": "睡眠を助ける",
         "calorie": "253kcal（1箱(54g)当たり）",
         "fairtrade": "無"
       }
@@ -758,7 +758,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 120,
         "cacao_percent": "28%",
-        "effect": "特にない",
+        "trait": "効果なし",
         "calorie": "120kcal（1個当たり）",
         "fairtrade": "無"
       }
@@ -770,7 +770,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 150,
         "cacao_percent": "30%",
-        "effect": "集中力が上がる",
+        "trait": "集中力が上がる",
         "calorie": "372kcal（1箱6個(102g)当たり）",
         "fairtrade": "無"
       }
@@ -782,7 +782,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 250,
         "cacao_percent": "55%",
-        "effect": "睡眠を助ける",
+        "trait": "睡眠を助ける",
         "calorie": "280kcal（1箱(48g)当たり）",
         "fairtrade": "無"
       }
@@ -794,7 +794,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 150,
         "cacao_percent": "30%",
-        "effect": "特にない",
+        "trait": "効果なし",
         "calorie": "262kcal（1枚(53g)当たり）",
         "fairtrade": "無"
       }
@@ -806,7 +806,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 150,
         "cacao_percent": "28%",
-        "effect": "集中力が上がる",
+        "trait": "集中力が上がる",
         "calorie": "258kcal（1枚(45g)当たり）",
         "fairtrade": "無"
       }
@@ -818,7 +818,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 110,
         "cacao_percent": "25%",
-        "effect": "睡眠を助ける",
+        "trait": "睡眠を助ける",
         "calorie": "130kcal（1袋当たり）",
         "fairtrade": "無"
       }
@@ -830,7 +830,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 130,
         "cacao_percent": "28%",
-        "effect": "特にない",
+        "trait": "効果なし",
         "calorie": "280kcal（1箱(75g)当たり）",
         "fairtrade": "無"
       }
@@ -842,7 +842,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 100,
         "cacao_percent": "25%",
-        "effect": "集中力が上がる",
+        "trait": "集中力が上がる",
         "calorie": "150kcal（1個当たり）",
         "fairtrade": "無"
       }
@@ -854,7 +854,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 200,
         "cacao_percent": "28%",
-        "effect": "睡眠を助ける",
+        "trait": "睡眠を助ける",
         "calorie": "160kcal（1個当たり）",
         "fairtrade": "無"
       }
@@ -866,7 +866,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 30,
         "cacao_percent": "25%",
-        "effect": "特にない",
+        "trait": "効果なし",
         "calorie": "70kcal（1本当たり）",
         "fairtrade": "無"
       }
@@ -878,7 +878,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 150,
         "cacao_percent": "28%",
-        "effect": "集中力が上がる",
+        "trait": "集中力が上がる",
         "calorie": "262kcal（1箱(52g)当たり）",
         "fairtrade": "無"
       }
@@ -890,7 +890,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 120,
         "cacao_percent": "28%",
-        "effect": "睡眠を助ける",
+        "trait": "睡眠を助ける",
         "calorie": "216kcal（1箱(37g)当たり）",
         "fairtrade": "無"
       }
@@ -902,7 +902,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 120,
         "cacao_percent": "28%",
-        "effect": "特にない",
+        "trait": "効果なし",
         "calorie": "230kcal（1箱(44g)当たり）",
         "fairtrade": "無"
       }
@@ -914,7 +914,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 120,
         "cacao_percent": "28%",
-        "effect": "集中力が上がる",
+        "trait": "集中力が上がる",
         "calorie": "234kcal（1箱(46g)当たり）",
         "fairtrade": "無"
       }
@@ -926,7 +926,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 180,
         "cacao_percent": "30%",
-        "effect": "睡眠を助ける",
+        "trait": "睡眠を助ける",
         "calorie": "280kcal（1本(52g)当たり）",
         "fairtrade": "無"
       }
@@ -938,7 +938,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 120,
         "cacao_percent": "25%",
-        "effect": "特にない",
+        "trait": "効果なし",
         "calorie": "220kcal（1箱当たり）",
         "fairtrade": "無"
       }
@@ -950,7 +950,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 200,
         "cacao_percent": "35%",
-        "effect": "集中力が上がる",
+        "trait": "集中力が上がる",
         "calorie": "280kcal（1箱(56g)当たり）",
         "fairtrade": "無"
       }
@@ -962,7 +962,7 @@ window.PRODUCTS_ROUND2 = {
       "attrs": {
         "price": 150,
         "cacao_percent": "28%",
-        "effect": "睡眠を助ける",
+        "trait": "睡眠を助ける",
         "calorie": "250kcal（1袋(50g)当たり）",
         "fairtrade": "無"
       }
