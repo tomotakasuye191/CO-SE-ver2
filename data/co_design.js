@@ -12,6 +12,7 @@
   var SIZES = [5, 10, 15, 20];
   var APRIME_COUNT = { 5: 2, 10: 3, 15: 5, 20: 6 };
   var TARGET = 0.7, BAND = 0.15, EPS = 1e-9;
+  var NEAR_MAX = 0.10; // SQ と A の数値トップ2属性の差が、水準範囲(最小〜最大)のこの割合以内なら「近い」
   var RESERVE_N = 3;
   var RESERVE_EXCLUDE = { yogurt: [1, 19, 21], rice: [1], wine: [4, 21], chocolate: [10] };
 
@@ -84,58 +85,85 @@
 
     function partial(v, a) { return E.partialUtility(def, lu, a, v[a]); }
     function tradeoff(v) { return rest.some(function (a) { return partial(v, a) > partial(A.v, a) + EPS; }); }
-    function diffBoth(v) { return top2.every(function (a) { return !sameClass(def, a, v, A.v); }); }
+    function diffBothStrict(v) { return top2.every(function (a) { return !sameClass(def, a, v, A.v); }); }
     function normOf(u) { return (u - ev.min) / ev.span; }
 
+    var useGap = false;
     function best(items) { // items: {p, v, u, mods, nch}
       var b = null, bd = 1e9;
       items.forEach(function (it) {
         var d = Math.abs(normOf(it.u) - TARGET);
+        if (useGap) { // Aとの数値トップ2属性の差が小さい方を最優先（0.05刻みで同等扱い）、同等なら0.7に近い方
+          var gi = Math.round(Math.max.apply(null, gapOf(it.p.v)) / 0.05), gb = b ? Math.round(Math.max.apply(null, gapOf(b.p.v)) / 0.05) : 0;
+          if (b !== null && gi !== gb) { if (gi < gb) { b = it; bd = d; } return; }
+        }
         if (b === null || d < bd - EPS || (Math.abs(d - bd) <= EPS && (it.nch < b.nch || (it.nch === b.nch && r() < 0.5)))) { b = it; bd = d; }
       });
       return b;
     }
+    // 数値のトップ2属性が A に近いか（差 ≤ 水準範囲×NEAR_MAX）。数値のトップ2属性がなければ判定しない
+    var numTop2 = top2.filter(function (a) { return def.coding[a] === 'linear'; });
+    function gapOf(v) {
+      return numTop2.map(function (a) { var lv = def.num[a].values; return Math.abs(v[a] - A.v[a]) / (lv[2] - lv[0]); });
+    }
+    function near(v) { return numTop2.length > 0 && gapOf(v).every(function (g) { return g <= NEAR_MAX + EPS; }); }
     function make(step, it) {
       var normU = normOf(it.u);
       var rank = 1 + ev.u.filter(function (x) { return x > it.u + EPS; }).length;
-      return { sq: it.p, step: step, mods: it.mods || {}, u: it.u, norm: normU, rank: rank, poolSize: pool.length,
+      return { sq: it.p, step: step, near: near(it.p.v), mods: it.mods || {}, u: it.u, norm: normU, rank: rank, poolSize: pool.length,
                gapRaw: uA - it.u, gapNorm: 1 - normU };
     }
     var inBand = function (u) { return Math.abs(normOf(u) - TARGET) <= BAND + EPS; };
     var others = pool.filter(function (p) { return p.id !== A.id && ev.byId[String(p.id)].u < uA - EPS; });
 
-    // 1) 両方異なる・トレードオフあり・帯内の実在商品
-    var s1 = others.filter(function (p) { return diffBoth(p.v) && tradeoff(p.v) && inBand(ev.byId[String(p.id)].u); })
-      .map(function (p) { return { p: p, u: ev.byId[String(p.id)].u, nch: 0 }; });
-    var b = best(s1); if (b) return make(1, b);
-
-    // 2) 両方異なる実在商品の許可属性を最大2つ変更して帯に収める
-    var s2 = [];
-    others.filter(function (p) { return diffBoth(p.v); }).forEach(function (p) {
-      var combos = [];
-      modAttrs.forEach(function (a) { combos.push([a]); });
-      for (var i = 0; i < modAttrs.length; i++) for (var j = i + 1; j < modAttrs.length; j++) combos.push([modAttrs[i], modAttrs[j]]);
-      combos.forEach(function (c) {
-        var lists = c.map(function (a) {
-          var cur = E.classOf(def, a, p.v[a]), out = [];
-          for (var l = 0; l < def.nlev[a]; l++) if (l !== cur) out.push(l);
-          return out;
-        });
-        var enumerate = function (idx, acc) {
-          if (idx === c.length) {
-            var v2 = {}; Object.keys(p.v).forEach(function (k) { v2[k] = p.v[k]; });
-            var mods = {};
-            c.forEach(function (a, n) { v2[a] = acc[n]; mods[a] = acc[n]; });
-            var u2 = E.productUtility(def, lu, v2);
-            if (u2 < uA - EPS && tradeoff(v2) && inBand(u2)) s2.push({ p: p, u: u2, mods: mods, nch: c.length });
-            return;
-          }
-          lists[idx].forEach(function (l) { enumerate(idx + 1, acc.concat([l])); });
-        };
-        enumerate(0, []);
+    // 近い基準財用の「異なる」判定：カテゴリ属性は水準が違う／数値属性は水準が同じでも値そのものが違えばよい
+    function diffNear(v) {
+      return top2.every(function (a) {
+        if (def.coding[a] === 'linear') return Math.abs(v[a] - A.v[a]) > EPS;
+        return !sameClass(def, a, v, A.v);
       });
-    });
-    b = best(s2); if (b) return make(2, b);
+    }
+    function stepBoth(onlyNear) {
+      var nr = function () { return true; };
+      var diffBoth = onlyNear ? diffNear : diffBothStrict;
+      // 1) 両方異なる・トレードオフあり・帯内の実在商品
+      var s1 = others.filter(function (p) { return diffBoth(p.v) && nr(p.v) && tradeoff(p.v) && inBand(ev.byId[String(p.id)].u); })
+        .map(function (p) { return { p: p, u: ev.byId[String(p.id)].u, nch: 0 }; });
+      var b1 = best(s1); if (b1) return make(1, b1);
+      // 2) 両方異なる実在商品の許可属性を最大2つ変更して帯に収める
+      var s2 = [];
+      others.filter(function (p) { return diffBoth(p.v) && nr(p.v); }).forEach(function (p) {
+        var combos = [];
+        modAttrs.forEach(function (a) { combos.push([a]); });
+        for (var i = 0; i < modAttrs.length; i++) for (var j = i + 1; j < modAttrs.length; j++) combos.push([modAttrs[i], modAttrs[j]]);
+        combos.forEach(function (c) {
+          var lists = c.map(function (a) {
+            var cur = E.classOf(def, a, p.v[a]), out = [];
+            for (var l = 0; l < def.nlev[a]; l++) if (l !== cur) out.push(l);
+            return out;
+          });
+          var enumerate = function (idx, acc) {
+            if (idx === c.length) {
+              var v2 = {}; Object.keys(p.v).forEach(function (k) { v2[k] = p.v[k]; });
+              var mods = {};
+              c.forEach(function (a, n) { v2[a] = acc[n]; mods[a] = acc[n]; });
+              var u2 = E.productUtility(def, lu, v2);
+              if (u2 < uA - EPS && tradeoff(v2) && inBand(u2)) s2.push({ p: p, u: u2, mods: mods, nch: c.length });
+              return;
+            }
+            lists[idx].forEach(function (l) { enumerate(idx + 1, acc.concat([l])); });
+          };
+          enumerate(0, []);
+        });
+      });
+      var b2 = best(s2); if (b2) return make(2, b2);
+      return null;
+    }
+    var b;
+    // 0) まず「A に近い基準財」を優先（数値のトップ2属性の差が小さい）。ステップ1→2の順
+    useGap = numTop2.length > 0;
+    var rb = stepBoth(true); useGap = false; if (rb) return rb;
+    var rb2 = stepBoth(false); if (rb2) return rb2;
 
     // 3) 共有1：重視度の高い方のtop2属性だけ異なる実在商品で、帯内
     var share1 = others.filter(function (p) { return !sameClass(def, top2[0], p.v, A.v) && sameClass(def, top2[1], p.v, A.v); })
@@ -223,7 +251,7 @@
   }
 
   var api = {
-    SIZES: SIZES, APRIME_COUNT: APRIME_COUNT, TARGET: TARGET, BAND: BAND, shuffle: shuffle,
+    SIZES: SIZES, APRIME_COUNT: APRIME_COUNT, NEAR_MAX: NEAR_MAX, TARGET: TARGET, BAND: BAND, shuffle: shuffle,
     buildPool: buildPool, evalPool: evalPool, constantAttrs: constantAttrs, pickTop2: pickTop2, pickA: pickA,
     pickSQ: pickSQ, modsToOverrides: modsToOverrides, makeAprime: makeAprime, setup: setup, composeSlide: composeSlide
   };
