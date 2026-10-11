@@ -365,7 +365,7 @@
     fail('基準となる商品を決められませんでした。最初のページからやり直してください。');
     return;
   }
-  const A = setup.A;
+  const A0 = setup.A;   // プール内で効用が最大の商品（SQ選定の基準）。スライドごとのAは setup.As
   const SQ = setup.sq.sq;
   const sqOverrides = window.CODesign.modsToOverrides(DEF, setup.sq.mods);   // 基準財の表示上書き（ステップ2のときだけ）
 
@@ -438,6 +438,7 @@
   let phase = 'round1';
   let remaining1 = [], remaining2 = [];
   const records = [];   // 各スライドの記録
+  let slideNo = 0;      // 何枚目のスライドか（0始まり）。スライドごとに別のAを割り当てる
 
   function currentStepNo(){
     if(phase === 'round1') return 1 + (SIZES.length - remaining1.length);
@@ -477,7 +478,9 @@
   }
 
   function renderSlide(round, size){
-    const slide = window.CODesign.composeSlide(DEF, lu, pool, setup, round, size);
+    const slideIdx = slideNo++;
+    const slide = window.CODesign.composeSlide(DEF, lu, pool, setup, round, size, undefined, slideIdx);
+    const aInfo = slide.aInfo;   // このスライドのA（順位・効用つき）
     const items = slide.items;
     const t0 = Date.now();
 
@@ -521,6 +524,9 @@
         chosenType: type,
         presentedIds: items.map(function(x){ return String(x.p.id); }),
         aPos: items.findIndex(function(x){ return x.isA; }) + 1,
+        aId: String(aInfo.p.id), aName: aInfo.p.name, aRank: aInfo.rank,
+        aNorm: setup.ev.byId[String(aInfo.p.id)].norm, aU: aInfo.u,
+        borrowedIds: slide.borrowedIds,
         aprimeIds: items.filter(function(x){ return x.isAprime; }).map(function(x){ return String(x.p.id); }),
         aprimeFallbackIds: items.filter(function(x){ return x.isAprime && x.apOk === false; }).map(function(x){ return String(x.p.id); })
       });
@@ -547,18 +553,18 @@
   }
 
   // ============================================================
-  // 親近感（馴染み）の質問：基準財とAについて、5段階
+  // 親近感（馴染み）の質問：基準財について、5段階
   // ============================================================
   const famAnswers = {};
   function renderFamiliarity(){
-    const order = window.CODesign.shuffle([ {key:'SQ', p:SQ}, {key:'A', p:A} ]);
-    famAnswers._order = order.map(function(x){ return x.key; }).join(',');
+    const order = [ {key:'SQ', p:SQ} ];
+    famAnswers._order = 'SQ';
     let html = '<div class="fam-screen">' +
       '<h1 class="fam-title">最後に、商品についてお伺いします</h1>' +
-      '<p class="fam-desc">これまでの実験に出てきた次の2つの商品について、ふだんどのくらい馴染みがあるかをお答えください（見たことがある、買ったことがある、よく知っている、など）。</p>';
+      '<p class="fam-desc">これまでの実験で基準として表示されていた次の商品について、ふだんどのくらい馴染みがあるかをお答えください（見たことがある、買ったことがある、よく知っている、など）。</p>';
     order.forEach(function(x, idx){
       html += '<div class="fam-card"><div class="thumb"><img src="../images/' + x.p.image + '" alt=""></div>' +
-        '<div class="fam-body"><div class="fam-name">商品' + (idx + 1) + '：' + escapeHtml(x.p.name) + '</div>' +
+        '<div class="fam-body"><div class="fam-name">' + escapeHtml(x.p.name) + '</div>' +
         '<div class="fam-scale">';
       for(let n = 1; n <= 5; n++){
         html += '<label><input type="radio" name="fam_' + x.key + '" value="' + n + '"><span>' + n + '</span></label>';
@@ -569,11 +575,11 @@
     app.innerHTML = html;
     const btn = document.getElementById('famSubmit');
     function update(){
-      ['SQ','A'].forEach(function(k){
+      ['SQ'].forEach(function(k){
         const el = document.querySelector('input[name="fam_' + k + '"]:checked');
         famAnswers[k] = el ? Number(el.value) : null;
       });
-      btn.disabled = !(famAnswers.SQ && famAnswers.A);
+      btn.disabled = !famAnswers.SQ;
     }
     Array.from(document.querySelectorAll('.fam-scale input')).forEach(function(inp){ inp.addEventListener('change', update); });
     btn.addEventListener('click', function(){ update(); if(!btn.disabled) submitResults(); });
@@ -590,17 +596,18 @@
       levelVersion: window.CONJOINT_VERSION, timeLimitSec: TIME_LIMIT_SEC,
       top2: setup.top2, top2Labels: setup.top2.map(labelOf),
       poolSize: pool.length,
-      A: { id: String(A.id), name: A.name, round: A.round, norm: setup.ev.byId[String(A.id)].norm, u: setup.ev.byId[String(A.id)].u },
+      A: { id: String(A0.id), name: A0.name, round: A0.round, norm: setup.ev.byId[String(A0.id)].norm, u: setup.ev.byId[String(A0.id)].u },   // プール内の最適財(1位)
+      aList: setup.As.map(function(x){ return { id: String(x.p.id), name: x.p.name, rank: x.rank, norm: x.norm, u: x.u }; }),   // スライド順のA
       SQ: {
         id: String(SQ.id), name: SQ.name, round: SQ.round, step: setup.sq.step,
         mods: Object.keys(setup.sq.mods).map(function(a){ return labelOf(a) + '→' + DEF.labels[a][setup.sq.mods[a]]; }),
         modCount: Object.keys(setup.sq.mods).length,
         norm: setup.sq.norm, u: setup.sq.u, rank: setup.sq.rank, gapRaw: setup.sq.gapRaw, gapNorm: setup.sq.gapNorm
       },
-      aValues: DEF.attrs.map(function(a){ return labelOf(a) + ':' + (DEF.coding[a] === 'linear' ? A.v[a] : (A.v[a] >= 0 ? DEF.labels[a][A.v[a]] : '水準外')); }),
+      aValues: DEF.attrs.map(function(a){ return labelOf(a) + ':' + (DEF.coding[a] === 'linear' ? A0.v[a] : (A0.v[a] >= 0 ? DEF.labels[a][A0.v[a]] : '水準外')); }),
       reserveIds: setup.reserve.map(function(p){ return String(p.id); }),
       slides: records,
-      familiarity: { SQ: famAnswers.SQ, A: famAnswers.A, order: famAnswers._order }
+      familiarity: { SQ: famAnswers.SQ, order: famAnswers._order }
     };
     try{ sessionStorage.setItem('experiment_pendingCO_' + good, JSON.stringify(payload)); }catch(e){}
     sendCOPayload(payload);
