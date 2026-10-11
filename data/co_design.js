@@ -1,6 +1,9 @@
 /* =========================================================================
    CO実験の財選定ロジック（site4 用。ブラウザ／Node 両対応）
-   ・A    ：全商品プール（1回目+2回目）で、被験者の推定効用が最大の実在商品
+   ・A    ：スライドごとに別の商品（毎回違う「合理的に最適な財」）。全商品プールの効用 上位8商品
+            （SLIDES=8）を、ランダムな順番で8スライドに1つずつ割り当てる。各スライドでは、そのAより
+            効用の高い商品は一切出さないので、そのスライド内ではAが必ず最適。1位の商品は 'A0'（基準）
+            としてSQ選定・top2の基準に使う。
    ・top2 ：重視度の高い2属性（パッケージと、プール内で全商品が同じ値の属性は除く）
    ・A'   ：他の商品の top2 の値を A と同じ表示に揃えたもの（A を超えず、SQ を上回る）
    ・SQ   ：基準財。被験者ごとに1つ固定。選定ステップ1〜5（下記）
@@ -76,9 +79,10 @@
   function sameClass(def, a, v1, v2) { return E.classOf(def, a, v1[a]) === E.classOf(def, a, v2[a]); }
 
   // SQの選定（ステップ1〜5）。rng は同点のランダム化用。
-  function pickSQ(def, lu, pool, ev, A, top2, rng) {
+  function pickSQ(def, lu, pool, ev, A, top2, rng, ceilU) {
     var r = rng || Math.random;
     var uA = ev.byId[String(A.id)].u;
+    var uCap = (ceilU === undefined) ? uA : Math.min(uA, ceilU); // SQ は全スライドのA(上位8)より効用が低いこと
     var rest = def.attrs.filter(function (a) { return top2.indexOf(a) === -1; });
     var cons = constantAttrs(def, pool);
     var modAttrs = (def.modifiable || []).filter(function (a) { return top2.indexOf(a) === -1 && cons.indexOf(a) === -1; });
@@ -114,7 +118,7 @@
                gapRaw: uA - it.u, gapNorm: 1 - normU };
     }
     var inBand = function (u) { return Math.abs(normOf(u) - TARGET) <= BAND + EPS; };
-    var others = pool.filter(function (p) { return p.id !== A.id && ev.byId[String(p.id)].u < uA - EPS; });
+    var others = pool.filter(function (p) { return p.id !== A.id && ev.byId[String(p.id)].u < uCap - EPS; });
 
     // 近い基準財用の「異なる」判定：カテゴリ属性は水準が違う／数値属性は水準が同じでも値そのものが違えばよい
     function diffNear(v) {
@@ -148,7 +152,7 @@
               var mods = {};
               c.forEach(function (a, n) { v2[a] = acc[n]; mods[a] = acc[n]; });
               var u2 = E.productUtility(def, lu, v2);
-              if (u2 < uA - EPS && tradeoff(v2) && inBand(u2)) s2.push({ p: p, u: u2, mods: mods, nch: c.length });
+              if (u2 < uCap - EPS && tradeoff(v2) && inBand(u2)) s2.push({ p: p, u: u2, mods: mods, nch: c.length });
               return;
             }
             lists[idx].forEach(function (l) { enumerate(idx + 1, acc.concat([l])); });
@@ -209,27 +213,48 @@
     return pick.map(function (x) { return { id: x.p.id, overrides: disp, u: x.u, ok: x.ok }; });
   }
 
-  // 被験者ごとの初期セットアップ（A, top2, SQ, 予備財）
+  // 被験者ごとの初期セットアップ（A0, 各スライドのA, top2, SQ, 予備財）
+  var N_SLIDES = SIZES.length * 2;
   function setup(good, def, lu, pool, rng) {
     var ev = evalPool(def, lu, pool);
-    var A = pickA(pool, ev);
+    var A0 = pickA(pool, ev);
     var top2 = pickTop2(def, lu, pool);
-    var s = pickSQ(def, lu, pool, ev, A, top2, rng);
+    // 効用の高い順に上位 N_SLIDES 個 = 各スライドのA候補（同点はプール内の順）
+    var order = pool.map(function (p, i) { return { p: p, u: ev.u[i], i: i }; })
+      .sort(function (x, y) { return (y.u - x.u) || (x.i - y.i); });
+    var nA = Math.min(N_SLIDES, pool.length - 1);
+    var top = order.slice(0, nA);
+    var ceilU = top[nA - 1].u;
+    var s = pickSQ(def, lu, pool, ev, A0, top2, rng, ceilU);
+    var ranked = top.map(function (x, k) {
+      return { p: x.p, rank: k + 1, u: x.u, norm: (x.u - ev.min) / ev.span };
+    });
+    var As = shuffle(ranked, rng); // スライド順（1回目の4枚→2回目の4枚）に割り当てる順番
+    var aIds = ranked.map(function (x) { return String(x.p.id); });
     var excl = RESERVE_EXCLUDE[good] || [];
     var resCand = pool.filter(function (p) {
-      return p.round === 1 && typeof p.id === 'number' && p.id <= 21 && excl.indexOf(p.id) === -1 && p.id !== A.id && p.id !== s.sq.id;
+      return p.round === 1 && typeof p.id === 'number' && p.id <= 21 && excl.indexOf(p.id) === -1 &&
+             aIds.indexOf(String(p.id)) === -1 && p.id !== s.sq.id;
     });
     var reserve = shuffle(resCand, rng).slice(0, RESERVE_N);
-    return { ev: ev, A: A, top2: top2, sq: s, reserve: reserve };
+    return { ev: ev, A: A0, As: As, aIds: aIds, top2: top2, sq: s, reserve: reserve };
   }
 
-  // 各スライドの構成。round=1: A + 1回目プールからランダム（A'なし）
-  //                  round=2: A + A' + 2回目プール（+予備財）からランダム
-  function composeSlide(def, lu, pool, st, round, size, rng) {
-    var A = st.A, SQ = st.sq.sq;
+  // 各スライドの構成。slideIdx(0〜7)番目のスライドのA = st.As[slideIdx]
+  //   round=1: A + 1回目プールからランダム（A'なし）
+  //   round=2: A + A' + 2回目プール（+予備財）からランダム
+  //   そのAより効用の高い商品・他スライドのA・SQは出さない。足りなければ反対側のプールから借りる
+  function composeSlide(def, lu, pool, st, round, size, rng, slideIdx) {
+    var ak = st.As[(slideIdx || 0) % st.As.length];
+    var A = ak.p, SQ = st.sq.sq;
     var reserveIds = st.reserve.map(function (p) { return String(p.id); });
+    function allowed(p) {
+      if (String(p.id) === String(A.id) || String(p.id) === String(SQ.id)) return false;
+      if (st.aIds.indexOf(String(p.id)) !== -1) return false;
+      return st.ev.byId[String(p.id)].u < ak.u - EPS;
+    }
     var avail = pool.filter(function (p) {
-      if (p.id === A.id || p.id === SQ.id) return false;
+      if (!allowed(p)) return false;
       if (round === 1) return p.round === 1 && reserveIds.indexOf(String(p.id)) === -1;
       return p.round === 2 || reserveIds.indexOf(String(p.id)) !== -1;
     });
@@ -243,15 +268,27 @@
     }
     var need = size - 1 - chosen.length;
     var fill = shuffle(avail, rng).slice(0, need);
+    var borrowed = [];
+    if (fill.length < need) { // 不足分：反対側のプールから借りる（予備財は1回目に使わない）
+      var used = {};
+      chosen.concat(fill).forEach(function (p) { used[String(p.id)] = 1; });
+      var extra = pool.filter(function (p) {
+        if (!allowed(p) || used[String(p.id)]) return false;
+        if (round === 1) return p.round === 2;
+        return p.round === 1 && reserveIds.indexOf(String(p.id)) === -1;
+      });
+      borrowed = shuffle(extra, rng).slice(0, need - fill.length);
+      fill = fill.concat(borrowed);
+    }
     var items = shuffle(chosen.concat(fill).map(function (p) {
       var ap = aprime.filter(function (x) { return String(x.id) === String(p.id); })[0];
       return { p: p, overrides: ap ? ap.overrides : null, isAprime: !!ap, apOk: ap ? ap.ok : null };
     }).concat([{ p: A, overrides: null, isAprime: false, isA: true }]), rng);
-    return { items: items, aprime: aprime };
+    return { items: items, aprime: aprime, A: A, aInfo: ak, borrowedIds: borrowed.map(function (p) { return String(p.id); }) };
   }
 
   var api = {
-    SIZES: SIZES, APRIME_COUNT: APRIME_COUNT, NEAR_MAX: NEAR_MAX, TARGET: TARGET, BAND: BAND, shuffle: shuffle,
+    SIZES: SIZES, APRIME_COUNT: APRIME_COUNT, NEAR_MAX: NEAR_MAX, N_SLIDES: N_SLIDES, TARGET: TARGET, BAND: BAND, shuffle: shuffle,
     buildPool: buildPool, evalPool: evalPool, constantAttrs: constantAttrs, pickTop2: pickTop2, pickA: pickA,
     pickSQ: pickSQ, modsToOverrides: modsToOverrides, makeAprime: makeAprime, setup: setup, composeSlide: composeSlide
   };
