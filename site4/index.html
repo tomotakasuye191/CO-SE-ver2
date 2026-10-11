@@ -37,6 +37,37 @@
     font-weight:700;
   }
   .progress{ font-size:10.5px; color:#7a8279; }
+  .timer-badge{
+    display:inline-block;
+    margin-left:10px;
+    padding:2px 9px;
+    border-radius:10px;
+    font-size:11px;
+    font-weight:700;
+    background:var(--accent-soft);
+    color:var(--accent);
+    letter-spacing:.02em;
+  }
+  .timer-badge.warn{ background:#fbeae6; color:var(--error); }
+  .timeout-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(28,43,36,.55);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:50;
+  }
+  .timeout-box{
+    background:#fff;
+    border-radius:2px;
+    padding:28px 36px;
+    text-align:center;
+    font-size:16px;
+    font-weight:700;
+    color:var(--error);
+    box-shadow:0 6px 24px rgba(0,0,0,.2);
+  }
   h1{
     font-size:15px;
     line-height:1.5;
@@ -203,6 +234,20 @@
     color:#fff;
     cursor:pointer;
   }
+
+  .fam-screen{ max-width:640px; margin:40px auto; }
+  .fam-card{ background:#fff; border:1px solid var(--line); border-radius:3px; padding:16px; margin-bottom:14px; display:flex; gap:14px; align-items:center; }
+  .fam-card .thumb{ flex:0 0 110px; width:110px; margin:0; cursor:default; }
+  .fam-body{ flex:1; min-width:0; }
+  .fam-name{ font-size:13px; font-weight:700; margin-bottom:8px; line-height:1.4; }
+  .fam-scale{ display:flex; gap:6px; flex-wrap:wrap; }
+  .fam-scale label{ display:flex; flex-direction:column; align-items:center; font-size:11px; color:#4b554e; cursor:pointer; min-width:44px; }
+  .fam-scale input{ margin:4px 0 2px; }
+  .fam-ends{ display:flex; justify-content:space-between; font-size:10.5px; color:#7a8279; margin-top:4px; }
+  .fam-title{ font-size:17px; font-weight:700; margin:0 0 8px; }
+  .fam-desc{ font-size:13px; line-height:1.7; color:#4b554e; margin:0 0 16px; }
+  button.primary{ padding:12px 28px; font-size:14px; font-weight:700; border:none; border-radius:2px; background:var(--accent); color:#fff; cursor:pointer; }
+  button.primary:disabled{ background:#b9c3be; cursor:not-allowed; }
 </style>
 </head>
 <body>
@@ -213,28 +258,31 @@
     </div>
   </div>
 
+<script src="../data/config.js"></script>
 <script src="../data/products.js"></script>
 <script src="../data/products_round2.js"></script>
-<script src="../data/round2_levels.js"></script>
+<script src="../data/product_levels.js"></script>
+<script src="../data/conjoint_defs.js"></script>
+<script src="../data/conjoint_engine.js"></script>
+<script src="../data/co_design.js"></script>
 <script>
 (function(){
 
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbzkWwIWaovkOpkjEITJRvqhfH77AdRkjcBjrg8mEVwezEYGr-u9Z3wTtp57ciri9StonA/exec";
-  const BASE_URL = "https://tomotakasuye191.github.io/CO-SE-ver2/";
-  const COMPLETE_URL = BASE_URL + "complete/index.html";
+  const CFG = window.EXP_CONFIG;
+  const GAS_URL = CFG.GAS_URL;
+  const BASE_URL = CFG.BASE_URL;
+  const TIME_LIMIT_SEC = Number(CFG.CO_TIME_LIMIT_SEC) || 0;   // 0 = 制限なし(ver2) / 25 = 時間制限あり(ver3)
 
   const GOOD_LABELS = { yogurt:'ヨーグルト', rice:'お米', wine:'ワイン', chocolate:'チョコレート' };
 
-  // 各財：画像を除く5属性のキーと表示ラベル（順番も表示順）
+  // 各財：画像を除く5属性の表示キーとラベル（順番も表示順）。パッケージは画像で表現される。
   const FIELD_DEFS = {
     yogurt: [['price','価格'],['volume','内容量'],['expiry','消費期限'],['nutrition','栄養情報'],['calorie','カロリー']],
     rice: [['price','価格'],['origin','産地'],['volume','内容量'],['harvest','精米時期'],['polish','精米度合い']],
     wine: [['price','価格'],['origin','ブドウ産地'],['abv','アルコール度数'],['color','色'],['taste','味わい']],
     chocolate: [['price','価格'],['cacao_percent','カカオ量'],['trait','特定の効果の有無'],['calorie','カロリー'],['fairtrade','フェアトレード']]
   };
-
-  const COMMON_COUNT = { 5:3, 10:5, 15:8, 20:10 };
-  const SIZES = [5, 10, 15, 20];
+  const SIZES = window.CODesign.SIZES;
 
   // ---- パラメータ取得 ----
   const urlParams = new URLSearchParams(window.location.search);
@@ -249,186 +297,30 @@
   const gender = getParam('gender');
   const age = getParam('age');
   const good = urlParams.get('good') || (current === '1' ? good1 : good2);
-  const item1 = urlParams.get('item1');
-  const item2 = urlParams.get('item2');
-  const hasImage = urlParams.get('hasImage') === '1';
-  const otherItem = urlParams.get('otherItem') || null;
 
-  // 重要視2項目（item1, item2）の水準別効用値。「次点に好ましい財」の計算に使う。
-  // 例："2,0,-1" のようなカンマ区切りの数値文字列で渡ってくる。
-  function parseUtils(raw){
-    if(!raw) return null;
-    return raw.split(',').map(Number);
-  }
-  const u1 = parseUtils(getParam('u1'));
-  const u2 = parseUtils(getParam('u2'));
-
-  // 基準財の抽選（好ましい順ランキング）に使う、全5属性の水準別効用値
-  function parseAllUtils(raw){
+  function parseLU(){
+    let raw = urlParams.get('lu');
+    if(!raw){ try{ raw = sessionStorage.getItem('experiment_lu_' + good); }catch(e){} }
     if(!raw) return null;
     try{ return JSON.parse(raw); }catch(e){ return null; }
   }
-  const allUtils = parseAllUtils(getParam('au'));
+  const lu = parseLU();
 
-  sessionStorage.setItem('experiment_id', id);
-  sessionStorage.setItem('experiment_group', group);
-  sessionStorage.setItem('experiment_good1', good1);
-  sessionStorage.setItem('experiment_good2', good2);
-  sessionStorage.setItem('experiment_current', current);
-  sessionStorage.setItem('experiment_gender', gender);
-  sessionStorage.setItem('experiment_age', age);
-  if(urlParams.get('u1')) sessionStorage.setItem('experiment_u1', urlParams.get('u1'));
-  if(urlParams.get('u2')) sessionStorage.setItem('experiment_u2', urlParams.get('u2'));
-  if(urlParams.get('au')) sessionStorage.setItem('experiment_au', urlParams.get('au'));
+  try{
+    sessionStorage.setItem('experiment_id', id);
+    sessionStorage.setItem('experiment_group', group);
+    sessionStorage.setItem('experiment_good1', good1);
+    sessionStorage.setItem('experiment_good2', good2);
+    sessionStorage.setItem('experiment_current', current);
+    sessionStorage.setItem('experiment_gender', gender);
+    sessionStorage.setItem('experiment_age', age);
+    if(lu) sessionStorage.setItem('experiment_lu_' + good, JSON.stringify(lu));
+  }catch(e){}
 
   const app = document.getElementById('app');
 
-  // GASのコールドスタート対策：ページを開いた時点で軽く一度呼んでおく（結果は使わない）
-  try{
-    fetch(GAS_URL, { method: 'GET', mode: 'no-cors' }).catch(function(){});
-  }catch(e){}
-
-  function fail(msg, retryFn){
-    const retryHtml = retryFn
-      ? '<button class="retry" id="retryActionBtn">再送信する</button>'
-      : '<button class="retry" onclick="location.reload()">再読み込み</button>';
-    app.innerHTML =
-      '<div class="error-screen"><div class="error-box">' + msg + '</div>' +
-      retryHtml + '</div>';
-    if(retryFn){
-      document.getElementById('retryActionBtn').addEventListener('click', retryFn);
-    }
-  }
-
-  if(!id || !good || !window.PRODUCTS || !window.PRODUCTS[good]){
-    fail('必要な情報が読み込めませんでした。最初のページからやり直してください。');
-    return;
-  }
-
-  if(!window.PRODUCTS_ROUND2 || !window.PRODUCTS_ROUND2[good]){
-    fail('2回目の実験用データ（products_round2.js）が読み込めませんでした。<br>' +
-         'サーバーに data/products_round2.js が正しくアップロードされているか確認してください。');
-    return;
-  }
-
-  if(!window.Round2Levels){
-    fail('2回目の実験用データ（round2_levels.js）が読み込めませんでした。<br>' +
-         'サーバーに data/round2_levels.js が正しくアップロードされているか確認してください。');
-    return;
-  }
-
-  if(!u1 || !u2){
-    fail('必要な情報（重要視項目の効用値）が読み込めませんでした。最初のページからやり直してください。');
-    return;
-  }
-
-  if(!allUtils){
-    fail('必要な情報（基準財の抽選に使う全属性の効用値）が読み込めませんでした。最初のページからやり直してください。');
-    return;
-  }
-
-  const products = window.PRODUCTS[good].slice(); // 21商品+追加財
-  const fieldDefs = FIELD_DEFS[good];
-  const goodLabel = GOOD_LABELS[good];
-
-  // ---- ユーティリティ ----
-  function shuffle(arr){
-    const a = arr.slice();
-    for(let i = a.length - 1; i > 0; i--){
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-  }
-  function sampleN(arr, n){ return shuffle(arr).slice(0, n); }
-
-  // 財1件の「全5属性」の合計効用スコア（基準財の抽選ランキングに使う）
-  function totalUtilityScore(product){
-    let s = 0;
-    fieldDefs.forEach(function(pair){
-      const key = pair[0];
-      const utils = allUtils[key];
-      if(utils) s += window.Round2Levels.utilFor(good, product, key, utils);
-    });
-    return s;
-  }
-
-  // 中央順位テーブル：size+1個抽選した中から、好ましい順で何番目を基準財にするか
-  const MID_RANK = { 5:3, 10:6, 15:8, 20:11 };
-
-  // プールから(size+1)個をランダム抽選し、全5属性の効用で好ましい順にランキングして、
-  // 中央順位の財を基準財として選ぶ。残りsize個が候補（presented）になる。
-  function pickBaseAndCandidates(pool, size){
-    const drawn = sampleN(pool, size + 1);
-    const ranked = drawn.slice().sort(function(a, b){ return totalUtilityScore(b) - totalUtilityScore(a); });
-    const rank = MID_RANK[size];
-    const base = ranked[rank - 1];
-    const candidates = shuffle(ranked.filter(function(p){ return p.id !== base.id; }));
-    return { base: base, candidates: candidates, ranked: ranked };
-  }
-
-  // rankedList（好ましい順、1位が先頭）の中で、指定したIDが何位だったかを返す（1始まり）。
-  // 見つからなければnull。
-  function rankOf(rankedList, id){
-    const idx = rankedList.findIndex(function(p){ return String(p.id) === String(id); });
-    return idx === -1 ? null : idx + 1;
-  }
-
-  function attrValue(product, key){ return product.attrs[key]; }
-  function formatValue(key, val){
-    // 上書き(overrides)された数値は元データの単位が失われているため、
-    // ここで属性ごとの単位を付け直し、かつ小数点以下は切り上げて整数にする
-    // （被験者から見て、実在財かどうかで数値の見た目に違いが出ないようにするため）。
-    if(key === 'price'){
-      return '¥' + Math.ceil(Number(val)).toLocaleString('ja-JP');
-    }
-    if(key === 'abv'){
-      return Math.ceil(Number(val)) + '%';
-    }
-    if(key === 'cacao_percent'){
-      const n = (typeof val === 'number') ? val : parseFloat(val);
-      return isNaN(n) ? val : (Math.ceil(n) + '%');
-    }
-    if(key === 'calorie'){
-      if(typeof val === 'number') return Math.ceil(val) + 'kcal';
-      return val; // 元々「○○kcal（△△あたり）」という文字列ならそのまま
-    }
-    if(key === 'volume'){
-      if(typeof val === 'number'){
-        const unit = (good === 'rice') ? 'kg' : 'g';
-        return Math.ceil(val) + unit;
-      }
-      return val;
-    }
-    if(key === 'expiry'){
-      if(typeof val === 'number') return '製造から' + Math.ceil(val) + '日';
-      return val;
-    }
-    return val;
-  }
-
-  // ---- 状態 ----
-  // baseItemはこれまでのように固定ではなく、ラウンド1・ラウンド2それぞれのスライド
-  // （サイズ5/10/15/20）ごとに毎回新しく抽選される。
-  // 2回目COの「候補20個」の画面は、プールが20財しかなく、(候補数+1)=21財の抽選に1財足りない。
-  // その不足を補うため、被験者ごとに1財を取り分け、1回目COの抽選から除外しておく。
-  // （1回目を始める前に除外するので、この財は1回目で必ず被験者に見せていない。）
-  // 取り分けの候補は、元の21商品（IDが1〜21）のうち、2回目の商品と同じ商品・同じ産地の別ボトルで
-  // 紛らわしいもの、写真が商品単体でないものを除いたもの。
-  const RESERVE_EXCLUDE = { yogurt:[1,19,21], rice:[1], wine:[4,21], chocolate:[10] };
-  const reserveCandidates = products.filter(function(p){
-    return p.id <= 21 && (RESERVE_EXCLUDE[good] || []).indexOf(p.id) === -1;
-  });
-  const reservedItem = reserveCandidates[Math.floor(Math.random() * reserveCandidates.length)];
-
-  let round1Pool = products.filter(function(p){ return p.id !== reservedItem.id; }); // CO1回目の候補母集団（取り分けた1財を除く）
-  let remainingSizes = [];      // ラウンド1の残りサイズ
-  let round1Records = [];       // {size, baseId, baseName, presentedIds, kept, chosenId, chosenName, ...}
-  let remainingSizes2 = [];     // ラウンド2の残りサイズ
-  let round2Records = [];       // {size, baseId, baseName, presentedIds, commonIds, overrideFields, kept, chosenId, chosenName, ...}
-  let phase = 'round1';         // 'round1' | 'round2'
-
-  const TOTAL_STEPS = SIZES.length * 2; // ラウンド1(4) + ラウンド2(4) = 8
+  // GASのコールドスタート対策
+  try{ fetch(GAS_URL, { method: 'GET', mode: 'no-cors' }).catch(function(){}); }catch(e){}
 
   function escapeHtml(s){
     return String(s).replace(/[&<>"']/g, function(c){
@@ -436,455 +328,329 @@
     });
   }
 
-  function currentStepNo(){
-    if(phase === 'round1'){
-      return 1 + (SIZES.length - remainingSizes.length); // 1〜4
-    }
-    if(phase === 'round2'){
-      return 1 + SIZES.length + (SIZES.length - remainingSizes2.length); // 5〜8
-    }
-    return 1;
+  function fail(msg, retryFn){
+    const retryHtml = retryFn
+      ? '<button class="retry" id="retryActionBtn">再送信する</button>'
+      : '<button class="retry" onclick="location.reload()">再読み込み</button>';
+    app.innerHTML = '<div class="error-screen"><div class="error-box">' + msg + '</div>' + retryHtml + '</div>';
+    if(retryFn) document.getElementById('retryActionBtn').addEventListener('click', retryFn);
   }
 
-  // ============================================================
-  // ラウンド1：操作なしCO測定（画像・全属性とも実データそのまま）
-  // ============================================================
-  function nextRound1Slide(){
-    if(remainingSizes.length === 0){
-      phase = 'round2';
-      remainingSizes2 = shuffle(SIZES);
-      renderRoundTransition();
-      return;
-    }
-    const size = remainingSizes.shift();
-    renderRound1Slide(size);
+  const DEF = window.CONJOINT_DEFS && window.CONJOINT_DEFS[good];
+  if(!id || !good || !DEF || !window.PRODUCTS || !window.PRODUCTS[good]){
+    fail('必要な情報が読み込めませんでした。最初のページからやり直してください。');
+    return;
+  }
+  if(!window.PRODUCTS_ROUND2 || !window.PRODUCTS_ROUND2[good] || !window.PRODUCT_LEVELS || !window.PRODUCT_LEVELS[good]){
+    fail('実験用データ（products_round2.js / product_levels.js）が読み込めませんでした。<br>サーバーに data フォルダが正しくアップロードされているか確認してください。');
+    return;
+  }
+  if(!lu || DEF.attrs.some(function(a){ return !lu[a]; })){
+    fail('必要な情報（コンジョイントの結果）が読み込めませんでした。最初のページからやり直してください。');
+    return;
   }
 
-  // ============================================================
-  // ラウンド間の区切り画面
-  // ============================================================
-  function renderRoundTransition(){
-    app.innerHTML =
-      '<div class="transition-screen">' +
-        '<h1>ここまでで1回目の実験が終わりました</h1>' +
-        '<p>' +
-          'ここからは条件を変えて、2回目の実験に入ります。<br>' +
-          '先ほどと同じように、' + goodLabel + 'を比較して選んでいただきます。' +
-        '</p>' +
-        '<button id="toRound2Btn">2回目の実験を始める</button>' +
-      '</div>';
-    document.getElementById('toRound2Btn').addEventListener('click', function(){
-      nextRound2Slide();
-    });
+  const goodLabel = GOOD_LABELS[good];
+  const fieldDefs = FIELD_DEFS[good];
+  const pool = window.CODesign.buildPool(good, window.PRODUCTS[good], window.PRODUCTS_ROUND2[good], window.PRODUCT_LEVELS[good]);
+  const setup = window.CODesign.setup(good, DEF, lu, pool);
+  if(!setup || !setup.sq){
+    fail('基準となる商品を決められませんでした。最初のページからやり直してください。');
+    return;
   }
+  const A = setup.A;
+  const SQ = setup.sq.sq;
+  const sqOverrides = window.CODesign.modsToOverrides(DEF, setup.sq.mods);   // 基準財の表示上書き（ステップ2のときだけ）
 
-  function renderRound1Slide(size){
-    const pool = round1Pool;
-    const picked = pickBaseAndCandidates(pool, size);
-    const baseItem = picked.base;
-    const presented = picked.candidates;
-
-    // 「合理的裁量財」：基準財より、この被験者が合理的なら必ず好ましいはずの財を
-    // 必ず候補内に1つ含める（似せる仕組みとは完全に別・毎回このスライドごとに計算し直す）。
-    let mandatory = null;
-    if(u1 && u2 && window.Round2Levels){
-      mandatory = window.Round2Levels.findMandatoryItem(good, item1, item2, u1, u2, baseItem, pool, presented, []);
-      if(mandatory && mandatory.replace){
-        presented[mandatory.replaceIndex] = mandatory.replaceWith;
-      }
-    }
-
-    let html = '';
-    html += '<div class="top"><span class="eyebrow">SITE 4 / ' + goodLabel + '（1回目）</span>' +
-            '<span class="progress">STEP ' + currentStepNo() + ' / ' + TOTAL_STEPS + '（候補' + size + '個）</span></div>';
-    html += '<h1>今回選ぶなら、どちらにしますか？</h1>';
-    html += '<p class="desc">左側は今回の基準となる商品です。右側をスクロールして他の候補と見比べ、気になったものをクリックしてください。左側をクリックすればそのまま選び続けられます。</p>';
-    html += '<div class="slide-layout">' +
-            '<div class="base-panel" id="basePanel"></div>' +
-            '<div class="candidates-panel"><div class="grid" id="slideGrid"></div></div>' +
-            '</div>';
-    app.innerHTML = html;
-
-    const basePanel = document.getElementById('basePanel');
-    const grid = document.getElementById('slideGrid');
-
-    // 基準財カード（左固定、実データのまま）
-    basePanel.appendChild(buildCard(baseItem, { isBase:true, hideImage:false, overrides:null }));
-
-    // 候補カード（合理的裁量財の枠は理想値に、基準財を上回ってしまう他の候補は弱める）
-    presented.forEach(function(p){
-      let overrides = null;
-      if(mandatory && mandatory.overridden && p.id === mandatory.id){
-        overrides = mandatory.overrides;
-      } else if(mandatory && mandatory.weakened && mandatory.weakened[p.id]){
-        overrides = mandatory.weakened[p.id];
-      }
-      grid.appendChild(buildCard(p, { isBase:false, hideImage:false, overrides:overrides }));
-    });
-
-    const clickable = Array.from(basePanel.children).concat(Array.from(grid.children));
-    clickable.forEach(function(cardEl){
-      cardEl.addEventListener('click', function(){
-        const clickedId = Number(cardEl.dataset.id);
-        const kept = (clickedId === baseItem.id);
-        const chosen = products.find(function(p){ return p.id === clickedId; });
-
-        round1Records.push({
-          size: size,
-          baseId: baseItem.id,
-          baseName: baseItem.name,
-          baseRank: MID_RANK[size],
-          totalRanked: size + 1,
-          chosenRank: rankOf(picked.ranked, clickedId),
-          presentedIds: presented.map(function(p){ return p.id; }),
-          mandatoryId: mandatory ? mandatory.id : null,
-          mandatoryName: mandatory ? mandatory.name : null,
-          mandatoryOverridden: mandatory ? mandatory.overridden : false,
-          mandatoryChosen: mandatory ? (String(clickedId) === String(mandatory.id)) : false,
-          kept: kept,
-          chosenId: clickedId,
-          chosenName: chosen ? chosen.name : baseItem.name
-        });
-
-        nextRound1Slide();
-      });
-    });
-  }
-
-  // ============================================================
-  // ラウンド2：操作あり CO・SE測定
-  // 基準財(base)は、その回のスライドごとに(size+1)個抽選→全5属性の効用で好ましい順に
-  // ランキングし、中央順位の財を基準財とする（pickBaseAndCandidates）。似せる基準
-  // （アンカー）は、ラウンド1の結果とは無関係に、コンジョイント結果から求めた
-  // 「次点に好ましい財」（提示候補の中で最もスコアが高い財）を使う。
-  // ============================================================
-  function nextRound2Slide(){
-    if(remainingSizes2.length === 0){
-      submitResults();
-      return;
-    }
-    const size = remainingSizes2.shift();
-    renderRound2Slide(size);
-  }
-
-  // 「絶対に好ましい財」に似せる財を選ぶ際、重要視2項目(item1/item2)以外の属性が
-  // できるだけばらけるように選ぶ。他の属性の値の組み合わせ（シグネチャ）が異なる財を
-  // 優先的に選び、種類が尽きたら重複を許可する。
-  function otherAttrsSignature(product, otherKeys){
-    return otherKeys.map(function(k){ return String(product.attrs[k]); }).join('|');
-  }
-  function pickDiverseCandidates(candidates, count, otherKeys){
-    const groups = {};
-    candidates.forEach(function(p){
-      const sig = otherAttrsSignature(p, otherKeys);
-      if(!groups[sig]) groups[sig] = [];
-      groups[sig].push(p);
-    });
-    const sigKeys = shuffle(Object.keys(groups));
-    sigKeys.forEach(function(k){ groups[k] = shuffle(groups[k]); });
-    const picked = [];
-    let idx = 0;
-    while(picked.length < count){
-      let anyAdded = false;
-      for(let i = 0; i < sigKeys.length && picked.length < count; i++){
-        const g = groups[sigKeys[i]];
-        if(g.length > idx){ picked.push(g[idx]); anyAdded = true; }
-      }
-      idx++;
-      if(!anyAdded) break; // 候補が尽きた
-    }
-    return picked;
-  }
-
-  function renderRound2Slide(size){
-    // 候補は「2回目CO用の新20商品」から出す。
-    // 「次点に好ましい財(アンカー)」の仕組みは廃止。代わりに、重要視2項目の効用値から
-    // 「絶対に好ましい財」（基準財より必ず好ましいはずの財）を1つ作り、それに重要視2項目を
-    // 揃えた「似せた財」を、これまでのcommonCountの数だけ追加で用意する。
-    const pool2 = window.PRODUCTS_ROUND2[good].slice();
-    // 抽選に必要な(候補数+1)財に足りない場合（候補20個の画面）だけ、1回目で見せていない取り分けの財を補う
-    const usedReserve = (pool2.length < size + 1);
-    if(usedReserve){ pool2.push(reservedItem); }
-    const picked = pickBaseAndCandidates(pool2, size);
-    const baseItem = picked.base;
-    const presented = picked.candidates;
-
-    // 「絶対に好ましい財」：基準財より合理的に必ず好ましいはずの財を1つ作る。
-    let mandatory = null;
-    if(u1 && u2 && window.Round2Levels){
-      mandatory = window.Round2Levels.findMandatoryItem(good, item1, item2, u1, u2, baseItem, pool2, presented, []);
-      if(mandatory && mandatory.replace){
-        presented[mandatory.replaceIndex] = mandatory.replaceWith;
-      }
-    }
-    const mandatoryCardId = mandatory ? presented[mandatory.replaceIndex].id : null;
-
-    // 「絶対に好ましい財」に、重要視2項目(item1/item2)を揃えた財を、
-    // これまでのcommonCountの数（本体1個含む）だけ用意する。
-    // それ以外の属性はできるだけばらけるように選ぶ。
-    const commonCount = COMMON_COUNT[size];
-    let commonSet = new Set();
-    let similarIds = [];
-    if(mandatory){
-      commonSet.add(mandatoryCardId);
-      const otherKeys = fieldDefs.map(function(pair){ return pair[0]; }).filter(function(k){ return k !== item1 && k !== item2; });
-      const eligible = presented.filter(function(p){ return p.id !== mandatoryCardId; });
-      const similarPicked = pickDiverseCandidates(eligible, commonCount - 1, otherKeys);
-      similarPicked.forEach(function(p){ commonSet.add(p.id); });
-      similarIds = similarPicked.map(function(p){ return p.id; });
-    }
-
-    const overrideFields = hasImage ? [otherItem] : [item1, item2];
-
-    let html = '';
-    html += '<div class="top"><span class="eyebrow">SITE 4 / ' + goodLabel + '（2回目）</span>' +
-            '<span class="progress">STEP ' + currentStepNo() + ' / ' + TOTAL_STEPS + '（候補' + size + '個）</span></div>';
-    html += '<h1>今回選ぶなら、どちらにしますか？</h1>';
-    html += '<p class="desc">左側は今回の基準となる商品です。右側をスクロールして他の候補と見比べ、気になったものをクリックしてください。</p>';
-    html += '<div class="slide-layout">' +
-            '<div class="base-panel" id="basePanel"></div>' +
-            '<div class="candidates-panel"><div class="grid" id="slideGrid"></div></div>' +
-            '</div>';
-    app.innerHTML = html;
-
-    const basePanel = document.getElementById('basePanel');
-    const grid = document.getElementById('slideGrid');
-
-    // 基準財（常にbaseItem。実データのまま）
-    basePanel.appendChild(buildCard(baseItem, { isBase:true, hideImage:false, overrides:null }));
-
-    presented.forEach(function(p){
-      let overrides = null;
-
-      if(mandatory && mandatory.overridden && p.id === mandatoryCardId){
-        // 絶対に好ましい財(本体)：理想の水準へ上書きする
-        overrides = mandatory.overrides;
-      } else if(similarIds.indexOf(p.id) !== -1){
-        // 絶対に好ましい財に似せた財：重要視2項目だけを本体と同じ値に揃える
-        overrides = {};
-        overrides[item1] = mandatory.overrides[item1];
-        overrides[item2] = mandatory.overrides[item2];
-      } else if(mandatory && mandatory.weakened && mandatory.weakened[p.id]){
-        // 似せた財グループ以外でたまたま基準財を上回ってしまっている財は弱める
-        overrides = mandatory.weakened[p.id];
-      }
-
-      grid.appendChild(buildCard(p, { isBase:false, hideImage:false, overrides:overrides }));
-    });
-
-    const clickable = Array.from(basePanel.children).concat(Array.from(grid.children));
-    clickable.forEach(function(cardEl){
-      cardEl.addEventListener('click', function(){
-        const clickedIdRaw = cardEl.dataset.id; // 文字列（基準財は数値ID、新候補は"b1"等）
-        const kept = (clickedIdRaw === String(baseItem.id));
-        let chosenName;
-        if(kept){
-          chosenName = baseItem.name;
-        } else {
-          const chosen = presented.find(function(p){ return String(p.id) === clickedIdRaw; });
-          chosenName = chosen ? chosen.name : '';
-        }
-
-        round2Records.push({
-          size: size,
-          baseId: baseItem.id,
-          baseName: baseItem.name,
-          baseRank: MID_RANK[size],
-          totalRanked: size + 1,
-          chosenRank: (mandatory && mandatory.overridden && !kept && clickedIdRaw === String(mandatory.id))
-            ? 1
-            : rankOf(picked.ranked, kept ? baseItem.id : clickedIdRaw),
-          mandatoryId: mandatory ? mandatory.id : null,
-          mandatoryName: mandatory ? mandatory.name : null,
-          mandatoryOverridden: mandatory ? mandatory.overridden : false,
-          mandatoryChosen: mandatory ? (clickedIdRaw === String(mandatory.id)) : false,
-          similarIds: similarIds,
-          reservedId: reservedItem.id,
-          reservedName: reservedItem.name,
-          reservedUsed: usedReserve,
-          presentedIds: presented.map(function(p){ return p.id; }),
-          commonIds: Array.from(commonSet),
-          overrideFields: overrideFields,
-          kept: kept,
-          chosenId: clickedIdRaw,
-          chosenName: chosenName
-        });
-
-        nextRound2Slide();
-      });
-    });
+  // ---- 表示 ----
+  function formatValue(key, val){
+    if(val === null || val === undefined) return '';
+    if(key === 'price' && typeof val === 'number') return '¥' + val.toLocaleString('ja-JP');
+    if(key === 'abv' && typeof val === 'number') return val + '%';
+    if(key === 'cacao_percent' && typeof val === 'number') return val + '%';
+    if(key === 'calorie' && typeof val === 'number') return val + 'kcal';
+    if(key === 'volume' && typeof val === 'number') return val + (good === 'rice' ? 'kg' : 'g');
+    if(key === 'expiry' && typeof val === 'number') return '製造から' + val + '日';
+    return val;
   }
 
   function buildCard(product, opts){
     const el = document.createElement('div');
     el.className = 'card' + (opts.isBase ? ' base' : '');
-    el.dataset.id = product.id;
-
+    el.dataset.id = String(product.id);
     let inner = '';
-    if(opts.isBase){
-      inner += '<span class="badge">今回の基準の商品</span>';
-    }
-
-    if(opts.hideImage){
-      inner += '<div class="thumb noimg">' + escapeHtml(product.name) + '</div>';
-    } else {
-      inner += '<div class="thumb"><img src="../images/' + product.image + '" alt="' + escapeHtml(product.name) + '"></div>';
-      inner += '<div class="pname">' + escapeHtml(product.name) + '</div>';
-    }
-
+    if(opts.isBase) inner += '<span class="badge">今回の基準の商品</span>';
+    inner += '<div class="thumb"><img src="../images/' + product.image + '" alt="' + escapeHtml(product.name) + '"></div>';
+    inner += '<div class="pname">' + escapeHtml(product.name) + '</div>';
     inner += '<div class="attrs">';
     fieldDefs.forEach(function(pair){
       const key = pair[0], label = pair[1];
-      let val = attrValue(product, key);
-      if(opts.overrides && Object.prototype.hasOwnProperty.call(opts.overrides, key)){
-        val = opts.overrides[key];
-      }
+      let val = product.attrs[key];
+      if(opts.overrides && Object.prototype.hasOwnProperty.call(opts.overrides, key)) val = opts.overrides[key];
       inner += '<div><span class="k">' + label + '</span><span class="v">' + escapeHtml(formatValue(key, val)) + '</span></div>';
     });
     inner += '</div>';
-
     el.innerHTML = inner;
     return el;
+  }
+
+  // ---- ver3：制限時間（TIME_LIMIT_SEC > 0 のときだけ有効） ----
+  function startCountdown(seconds, badgeEl, onTimeout){
+    let remaining = seconds, done = false;
+    function render(){
+      badgeEl.textContent = '⏱ 残り' + remaining + '秒';
+      badgeEl.classList.toggle('warn', remaining <= 10);
+    }
+    render();
+    const intervalId = setInterval(function(){
+      remaining -= 1;
+      if(remaining <= 0){ render(); finish(); return; }
+      render();
+    }, 1000);
+    function finish(){
+      if(done) return;
+      done = true;
+      clearInterval(intervalId);
+      onTimeout();
+    }
+    return { clear: function(){ if(done) return; done = true; clearInterval(intervalId); } };
+  }
+  function showTimeoutOverlay(callback){
+    const overlay = document.createElement('div');
+    overlay.className = 'timeout-overlay';
+    overlay.innerHTML = '<div class="timeout-box">時間切れです</div>';
+    document.body.appendChild(overlay);
+    setTimeout(function(){ overlay.remove(); callback(); }, 1200);
+  }
+
+  // ---- 状態 ----
+  const TOTAL_STEPS = SIZES.length * 2;
+  let phase = 'round1';
+  let remaining1 = [], remaining2 = [];
+  const records = [];   // 各スライドの記録
+
+  function currentStepNo(){
+    if(phase === 'round1') return 1 + (SIZES.length - remaining1.length);
+    return 1 + SIZES.length + (SIZES.length - remaining2.length);
+  }
+
+  function nextSlide(){
+    if(phase === 'round1'){
+      if(remaining1.length === 0){
+        phase = 'round2';
+        remaining2 = window.CODesign.shuffle(SIZES);
+        renderRoundTransition();
+        return;
+      }
+      renderSlide(1, remaining1.shift());
+    } else {
+      if(remaining2.length === 0){ renderFamiliarity(); return; }
+      renderSlide(2, remaining2.shift());
+    }
+  }
+
+  function renderRoundTransition(){
+    app.innerHTML =
+      '<div class="transition-screen">' +
+        '<h1>ここまでで1回目の実験が終わりました</h1>' +
+        '<p>ここからは条件を変えて、2回目の実験に入ります。<br>先ほどと同じように、' + goodLabel + 'を比較して選んでいただきます。</p>' +
+        '<button id="toRound2Btn">2回目の実験を始める</button>' +
+      '</div>';
+    document.getElementById('toRound2Btn').addEventListener('click', nextSlide);
+  }
+
+  function chosenTypeOf(item){
+    if(!item) return '基準財';
+    if(item.isA) return 'A';
+    if(item.isAprime) return 'Aprime';
+    return 'その他';
+  }
+
+  function renderSlide(round, size){
+    const slide = window.CODesign.composeSlide(DEF, lu, pool, setup, round, size);
+    const items = slide.items;
+    const t0 = Date.now();
+
+    let html = '';
+    html += '<div class="top"><span class="eyebrow">SITE 4 / ' + goodLabel + '（' + round + '回目）</span>' +
+            '<span class="progress">STEP ' + currentStepNo() + ' / ' + TOTAL_STEPS + '（候補' + size + '個）</span>' +
+            (TIME_LIMIT_SEC > 0 ? '<span class="timer-badge" id="timerBadge"></span>' : '') + '</div>';
+    html += '<h1>今回選ぶなら、どちらにしますか？</h1>';
+    html += '<p class="desc">左側は今回の基準となる商品です。右側をスクロールして他の候補と見比べ、気になったものをクリックしてください。左側をクリックすれば、基準の商品を選んだことになります。' +
+            (TIME_LIMIT_SEC > 0 ? '<b>制限時間は' + TIME_LIMIT_SEC + '秒です。</b>' : '') + '</p>';
+    html += '<div class="slide-layout"><div class="base-panel" id="basePanel"></div>' +
+            '<div class="candidates-panel"><div class="grid" id="slideGrid"></div></div></div>';
+    app.innerHTML = html;
+
+    const basePanel = document.getElementById('basePanel');
+    const grid = document.getElementById('slideGrid');
+    basePanel.appendChild(buildCard(SQ, { isBase:true, overrides:sqOverrides }));
+    items.forEach(function(it){
+      grid.appendChild(buildCard(it.p, { isBase:false, overrides:it.overrides }));
+    });
+
+    let answered = false, timer = null;
+
+    function commit(clickedId, timedOut){
+      const rt = Date.now() - t0;
+      let chosen = null, kept = false, type;
+      if(timedOut){ type = '時間切れ'; }
+      else if(String(clickedId) === String(SQ.id) && !items.some(function(x){ return String(x.p.id) === String(clickedId); })){
+        kept = true; type = '基準財';
+      } else {
+        chosen = items.filter(function(x){ return String(x.p.id) === String(clickedId); })[0];
+        type = chosenTypeOf(chosen);
+      }
+      records.push({
+        round: round, size: size, rtMs: rt, timedOut: !!timedOut, kept: kept,
+        chosenId: timedOut ? null : String(clickedId),
+        chosenName: timedOut ? '(回答なし/時間切れ)' : (kept ? SQ.name : (chosen ? chosen.p.name : '')),
+        chosenType: type,
+        presentedIds: items.map(function(x){ return String(x.p.id); }),
+        aPos: items.findIndex(function(x){ return x.isA; }) + 1,
+        aprimeIds: items.filter(function(x){ return x.isAprime; }).map(function(x){ return String(x.p.id); }),
+        aprimeFallbackIds: items.filter(function(x){ return x.isAprime && x.apOk === false; }).map(function(x){ return String(x.p.id); })
+      });
+      nextSlide();
+    }
+
+    const clickable = Array.from(basePanel.children).concat(Array.from(grid.children));
+    clickable.forEach(function(cardEl){
+      cardEl.addEventListener('click', function(){
+        if(answered) return;
+        answered = true;
+        if(timer) timer.clear();
+        commit(cardEl.dataset.id, false);
+      });
+    });
+
+    if(TIME_LIMIT_SEC > 0){
+      timer = startCountdown(TIME_LIMIT_SEC, document.getElementById('timerBadge'), function(){
+        if(answered) return;
+        answered = true;
+        showTimeoutOverlay(function(){ commit(null, true); });
+      });
+    }
+  }
+
+  // ============================================================
+  // 親近感（馴染み）の質問：基準財とAについて、5段階
+  // ============================================================
+  const famAnswers = {};
+  function renderFamiliarity(){
+    const order = window.CODesign.shuffle([ {key:'SQ', p:SQ}, {key:'A', p:A} ]);
+    famAnswers._order = order.map(function(x){ return x.key; }).join(',');
+    let html = '<div class="fam-screen">' +
+      '<h1 class="fam-title">最後に、商品についてお伺いします</h1>' +
+      '<p class="fam-desc">これまでの実験に出てきた次の2つの商品について、ふだんどのくらい馴染みがあるかをお答えください（見たことがある、買ったことがある、よく知っている、など）。</p>';
+    order.forEach(function(x, idx){
+      html += '<div class="fam-card"><div class="thumb"><img src="../images/' + x.p.image + '" alt=""></div>' +
+        '<div class="fam-body"><div class="fam-name">商品' + (idx + 1) + '：' + escapeHtml(x.p.name) + '</div>' +
+        '<div class="fam-scale">';
+      for(let n = 1; n <= 5; n++){
+        html += '<label><input type="radio" name="fam_' + x.key + '" value="' + n + '"><span>' + n + '</span></label>';
+      }
+      html += '</div><div class="fam-ends"><span>1：まったく馴染みがない</span><span>5：とても馴染みがある</span></div></div></div>';
+    });
+    html += '<div style="text-align:center;margin-top:18px;"><button class="primary" id="famSubmit" disabled>回答を送信して次へ</button></div></div>';
+    app.innerHTML = html;
+    const btn = document.getElementById('famSubmit');
+    function update(){
+      ['SQ','A'].forEach(function(k){
+        const el = document.querySelector('input[name="fam_' + k + '"]:checked');
+        famAnswers[k] = el ? Number(el.value) : null;
+      });
+      btn.disabled = !(famAnswers.SQ && famAnswers.A);
+    }
+    Array.from(document.querySelectorAll('.fam-scale input')).forEach(function(inp){ inp.addEventListener('change', update); });
+    btn.addEventListener('click', function(){ update(); if(!btn.disabled) submitResults(); });
   }
 
   // ============================================================
   // 送信 & 次のステップへ
   // ============================================================
+  function labelOf(attr){ return DEF.attrLabels[attr]; }
+
   function submitResults(){
-    const round1Payload = {
-      slideOrder: round1Records.map(function(r){ return r.size; }),
-      results: {},
-      mandatory: {},
-      base: {}
-    };
-    round1Records.forEach(function(r){
-      round1Payload.results[r.size] = { kept: r.kept, chosenId: r.chosenId, chosenName: r.chosenName, chosenRank: r.chosenRank, totalRanked: r.totalRanked };
-      round1Payload.mandatory[r.size] = {
-        mandatoryId: r.mandatoryId,
-        mandatoryName: r.mandatoryName,
-        mandatoryOverridden: r.mandatoryOverridden,
-        mandatoryChosen: r.mandatoryChosen
-      };
-      round1Payload.base[r.size] = { baseId: r.baseId, baseName: r.baseName, baseRank: r.baseRank };
-    });
-
-    const round2Payload = {
-      slideOrder: round2Records.map(function(r){ return r.size; }),
-      results: {},
-      commonality: {},
-      base: {}
-    };
-    round2Records.forEach(function(r){
-      round2Payload.results[r.size] = { kept: r.kept, chosenId: r.chosenId, chosenName: r.chosenName, chosenRank: r.chosenRank, totalRanked: r.totalRanked };
-      round2Payload.commonality[r.size] = {
-        mandatoryId: r.mandatoryId,
-        mandatoryName: r.mandatoryName,
-        mandatoryOverridden: r.mandatoryOverridden,
-        mandatoryChosen: r.mandatoryChosen,
-        similarIds: r.similarIds,
-        reservedId: r.reservedId,
-        reservedName: r.reservedName,
-        reservedUsed: r.reservedUsed,
-        commonCount: r.commonIds.length,
-        commonIds: r.commonIds,
-        presentedIds: r.presentedIds,
-        overrideFields: r.overrideFields
-      };
-      round2Payload.base[r.size] = { baseId: r.baseId, baseName: r.baseName, baseRank: r.baseRank };
-    });
-
     const payload = {
-      action: 'submitCO',
-      id: id, good: good,
-      round1: round1Payload,
-      round2: round2Payload
+      action: 'submitCO', schema: 2, id: id, good: good,
+      levelVersion: window.CONJOINT_VERSION, timeLimitSec: TIME_LIMIT_SEC,
+      top2: setup.top2, top2Labels: setup.top2.map(labelOf),
+      poolSize: pool.length,
+      A: { id: String(A.id), name: A.name, round: A.round, norm: setup.ev.byId[String(A.id)].norm, u: setup.ev.byId[String(A.id)].u },
+      SQ: {
+        id: String(SQ.id), name: SQ.name, round: SQ.round, step: setup.sq.step,
+        mods: Object.keys(setup.sq.mods).map(function(a){ return labelOf(a) + '→' + DEF.labels[a][setup.sq.mods[a]]; }),
+        modCount: Object.keys(setup.sq.mods).length,
+        norm: setup.sq.norm, u: setup.sq.u, rank: setup.sq.rank, gapRaw: setup.sq.gapRaw, gapNorm: setup.sq.gapNorm
+      },
+      aValues: DEF.attrs.map(function(a){ return labelOf(a) + ':' + (DEF.coding[a] === 'linear' ? A.v[a] : (A.v[a] >= 0 ? DEF.labels[a][A.v[a]] : '水準外')); }),
+      reserveIds: setup.reserve.map(function(p){ return String(p.id); }),
+      slides: records,
+      familiarity: { SQ: famAnswers.SQ, A: famAnswers.A, order: famAnswers._order }
     };
-
-    // 送信前に保存しておく → 通信に失敗して再読み込みしても、この回答から再送信できる
-    sessionStorage.setItem('experiment_pendingCO_' + good, JSON.stringify(payload));
-
+    try{ sessionStorage.setItem('experiment_pendingCO_' + good, JSON.stringify(payload)); }catch(e){}
     sendCOPayload(payload);
   }
 
-  // 通信エラー・サーバーエラーいずれの場合も、間隔を空けながら自動で複数回リトライする。
-  // 1,2,4,8,16秒間隔で最大5回自動リトライし、それでも失敗した場合だけ手動リトライの
-  // ボタンを表示する（「Load failed」等、モバイル回線特有の一時的な通信断に強くするため）。
+  // 通信エラー・サーバーエラーいずれの場合も 1,2,4,8,16秒間隔で最大5回自動リトライする
   const CO_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 16000];
 
   function sendCOPayload(payload, attempt){
     attempt = attempt || 0;
     const attemptLabel = attempt > 0 ? '（自動再送信 ' + attempt + '/' + CO_RETRY_DELAYS_MS.length + ' 回目…）' : '';
-    app.innerHTML =
-      '<div class="loading-screen"><div class="spinner"></div><p>結果を記録しています…' + attemptLabel + '</p></div>';
+    app.innerHTML = '<div class="loading-screen"><div class="spinner"></div><p>結果を記録しています…' + attemptLabel + '</p></div>';
 
-    fetch(GAS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    }).then(function(res){
+    fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) })
+      .then(function(res){
         return res.text().then(function(text){
           let parsed;
-          try{
-            parsed = JSON.parse(text);
-          }catch(e){
-            throw new Error('サーバーから予期しない応答（HTTP ' + res.status + '）: ' + text.slice(0, 200));
-          }
+          try{ parsed = JSON.parse(text); }
+          catch(e){ throw new Error('サーバーから予期しない応答（HTTP ' + res.status + '）: ' + text.slice(0, 200)); }
           return parsed;
         });
       })
       .then(function(data){
-        if(data.status !== 'ok'){
-          retryOrFail(payload, attempt, (data.message || '記録に失敗しました。'));
-          return;
-        }
-        sessionStorage.removeItem('experiment_pendingCO_' + good);
+        if(data.status !== 'ok'){ retryOrFail(payload, attempt, (data.message || '記録に失敗しました。')); return; }
+        try{ sessionStorage.removeItem('experiment_pendingCO_' + good); }catch(e){}
         goToNext();
-      }).catch(function(err){
-        retryOrFail(payload, attempt, '通信エラーが発生しました：' + err.message);
-      });
+      })
+      .catch(function(err){ retryOrFail(payload, attempt, '通信エラーが発生しました：' + err.message); });
   }
 
   function retryOrFail(payload, attempt, message){
     if(attempt < CO_RETRY_DELAYS_MS.length){
       const delay = CO_RETRY_DELAYS_MS[attempt];
-      app.innerHTML =
-        '<div class="loading-screen"><div class="spinner"></div><p>' + escapeHtml(message) +
+      app.innerHTML = '<div class="loading-screen"><div class="spinner"></div><p>' + escapeHtml(message) +
         '<br>' + Math.round(delay / 1000) + '秒後に自動で再送信します…</p></div>';
       setTimeout(function(){ sendCOPayload(payload, attempt + 1); }, delay);
       return;
     }
-    fail(message + '<br>回答データは保存されているので、再送信できます。',
-         function(){ sendCOPayload(payload, 0); });
+    fail(escapeHtml(message) + '<br>回答データは保存されているので、再送信できます。', function(){ sendCOPayload(payload, 0); });
   }
 
   function goToNext(){
-    if(current === '1'){
-      // 1財目のCOが終わった → まず1財目の知識アンケートへ（このアンケートの後、site5側で2財目のコンジョイントへ進む）
-      const query = new URLSearchParams({ id:id, group:group, good1:good1, good2:good2, current:'1', gender:gender, age:age });
-      window.location.href = BASE_URL + 'site5/' + good1 + '.html?' + query.toString();
-    } else {
-      // 2財目のCOも終わった → 2財目の知識アンケートへ（このアンケートの後、site5側で完了ページへ進む）
-      const query = new URLSearchParams({ id:id, group:group, good1:good1, good2:good2, current:'2', gender:gender, age:age });
-      window.location.href = BASE_URL + 'site5/' + good2 + '.html?' + query.toString();
-    }
+    const query = new URLSearchParams({ id:id, group:group, good1:good1, good2:good2, current:current, gender:gender, age:age });
+    const target = (current === '1') ? good1 : good2;
+    window.location.href = BASE_URL + 'site5/' + target + '.html?' + query.toString();
   }
 
   // ---- 開始 ----
   function startExperiment(){
-    remainingSizes = shuffle(SIZES);
-    nextRound1Slide();
+    remaining1 = window.CODesign.shuffle(SIZES);
+    nextSlide();
   }
 
   // 直前のセッションで送信に失敗した回答が残っていれば、まずそれを再送信する
-  const pendingRaw = sessionStorage.getItem('experiment_pendingCO_' + good);
+  let pendingRaw = null;
+  try{ pendingRaw = sessionStorage.getItem('experiment_pendingCO_' + good); }catch(e){}
   if(pendingRaw){
     try{
       const pendingPayload = JSON.parse(pendingRaw);
-      app.innerHTML = '<div class="loading-screen"><div class="spinner"></div>' +
-        '<p>前回未送信だった回答が見つかりました。送信しています…</p></div>';
+      app.innerHTML = '<div class="loading-screen"><div class="spinner"></div><p>前回未送信だった回答が見つかりました。送信しています…</p></div>';
       sendCOPayload(pendingPayload);
     }catch(e){
-      sessionStorage.removeItem('experiment_pendingCO_' + good);
+      try{ sessionStorage.removeItem('experiment_pendingCO_' + good); }catch(e2){}
       startExperiment();
     }
   } else {

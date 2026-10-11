@@ -364,6 +364,7 @@
 
 </div>
 
+<script src="../data/config.js"></script>
 <script>
 const SURVEY_KEY_PREFIX = 'response:wine:';
 const PRODUCT = 'ワイン';
@@ -371,8 +372,8 @@ const PRODUCT = 'ワイン';
 /* =========================================================================
    本システム（サイト1〜5）との連携設定
    ========================================================================= */
-const BASE_URL = "https://tomotakasuye191.github.io/CO-SE-ver2/";
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzkWwIWaovkOpkjEITJRvqhfH77AdRkjcBjrg8mEVwezEYGr-u9Z3wTtp57ciri9StonA/exec";
+const BASE_URL = window.EXP_CONFIG.BASE_URL;
+const GAS_URL = window.EXP_CONFIG.GAS_URL;
 const GOOD_CODE = "wine";
 
 const SYS_PARAMS = new URLSearchParams(window.location.search);

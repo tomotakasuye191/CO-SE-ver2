@@ -272,13 +272,14 @@
     <button type="button" id="flowNextBtn">実験を始める</button>
   </div>
 
+<script src="../data/config.js"></script>
 <script>
   // ▼ GASデプロイ後に発行される「ウェブアプリのURL」に差し替えてください
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbzkWwIWaovkOpkjEITJRvqhfH77AdRkjcBjrg8mEVwezEYGr-u9Z3wTtp57ciri9StonA/exec";
+  const GAS_URL = window.EXP_CONFIG.GAS_URL;
 
   // ▼ サイト2のURL（同一リポジトリ内のパスに合わせて調整してください）
   // ▼ リポジトリの絶対URL（全ページ遷移をこれ基準にすることで相対パスの事故を防ぐ）
-  const BASE_URL = "https://tomotakasuye191.github.io/CO-SE-ver2/";
+  const BASE_URL = window.EXP_CONFIG.BASE_URL;
 
   const form = document.getElementById('entryForm');
   const submitBtn = document.getElementById('submitBtn');
