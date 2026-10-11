@@ -11,6 +11,8 @@
   var E = window.ConjointEngine;
   var GOOD = DEF.good;
   var RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 16000];
+  // コード（推定・記録ロジック）の版。計算や記録の方法を変えたら更新する。
+  var CODE_VERSION = 'site2_code_2026-10-11c';
 
   var P = new URLSearchParams(window.location.search);
   var SYS = {
@@ -34,7 +36,7 @@
   var state = {
     current: 0, answers: new Array(N).fill(null),
     shownAt: 0, rtFirst: new Array(N).fill(null), rtFinal: new Array(N).fill(null),
-    startedAt: 0, lastResult: null
+    rtNext: new Array(N).fill(null), startedAtIso: '', startedAt: 0, lastResult: null
   };
 
   function $(id) { return document.getElementById(id); }
@@ -79,6 +81,7 @@
 
   $('btn-start').addEventListener('click', function () {
     state.startedAt = Date.now();
+    state.startedAtIso = new Date().toISOString();
     state.current = 0;
     renderSet();
     showScreen('screen-conjoint');
@@ -98,6 +101,7 @@
 
   $('btn-next-set').addEventListener('click', function () {
     if (state.answers[state.current] === null) return;
+    state.rtNext[state.current] = Date.now() - state.shownAt;
     state.current += 1;
     if (state.current < N) renderSet(); else finish();
   });
@@ -116,7 +120,7 @@
       action: 'submitConjoint', id: SYS.id, good: GOOD, gender: SYS.gender, age: SYS.age,
       surveyId: DEF.surveyId, levelVersion: window.CONJOINT_VERSION, lambda: E.LAMBDA,
       choices: state.answers.map(function (i) { return String.fromCharCode(65 + i); }),
-      rtFinalMs: state.rtFinal, rtFirstMs: state.rtFirst,
+      rtFinalMs: state.rtFinal, rtFirstMs: state.rtFirst, rtNextMs: state.rtNext,
       totalSec: r((Date.now() - state.startedAt) / 1000, 1),
       attentionCheck1: ac1, attentionCheck2: ac2,
       attrs: DEF.attrs,
@@ -124,7 +128,16 @@
       lu: lu,
       coef: an.coef,
       beta: an.beta.map(function (b) { return r(b, 6); }),
-      top1: an.top1, top2: an.top2
+      top1: an.top1, top2: an.top2,
+      // --- 分析用の追加記録（班員版の記録項目を取り込み） ---
+      codeVersion: CODE_VERSION, designHash: E.designHash(DEF),
+      paramNames: E.paramNames(DEF), betaSE: an.fit.betaSE.map(function (b) { return r(b, 6); }),
+      fit: { logLik: r(an.fit.logLik, 6), nullLogLik: r(an.fit.nullLogLik, 6), mcFadden: r(an.fit.mcFadden, 6),
+             hitRate: r(an.fit.hitRate, 6), chosenProbs: an.fit.chosenProbs.map(function (x) { return r(x, 6); }) },
+      estimation: { iterations: an.est.iterations, converged: an.est.converged, lastDelta: an.est.lastDelta,
+                    maxAbsBeta: r(Math.max.apply(null, an.beta.map(Math.abs)), 6), maxAbsGrad: an.fit.maxAbsGrad },
+      allSameChoice: (function () { var s = {}; state.answers.forEach(function (x) { s[x] = 1; }); return Object.keys(s).length === 1; })(),
+      startedAt: state.startedAtIso, submittedAt: new Date().toISOString()
     };
     return { payload: payload, lu: lu };
   }
