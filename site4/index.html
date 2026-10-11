@@ -248,6 +248,13 @@
   .fam-desc{ font-size:13px; line-height:1.7; color:#4b554e; margin:0 0 16px; }
   button.primary{ padding:12px 28px; font-size:14px; font-weight:700; border:none; border-radius:2px; background:var(--accent); color:#fff; cursor:pointer; }
   button.primary:disabled{ background:#b9c3be; cursor:not-allowed; }
+
+  .time-bar-wrap{ position:sticky; top:0; z-index:20; background:var(--paper); margin:-12px -14px 8px; padding:10px 14px 6px; }
+  .time-bar{ height:16px; border-radius:8px; background:#dcd7c8; overflow:hidden; }
+  .time-bar-fill{ height:100%; width:100%; background:var(--accent); border-radius:8px; transition:background .25s; }
+  .time-bar.warn .time-bar-fill{ background:#c0392b; }
+  .time-bar-label{ margin-top:3px; font-size:12px; font-weight:700; color:var(--accent); text-align:right; }
+  .time-bar-wrap:has(.warn) .time-bar-label{ color:#c0392b; }
 </style>
 </head>
 <body>
@@ -394,25 +401,28 @@
     return el;
   }
 
-  // ---- ver3：制限時間（TIME_LIMIT_SEC > 0 のときだけ有効） ----
-  function startCountdown(seconds, badgeEl, onTimeout){
-    let remaining = seconds, done = false;
+  // ---- ver3：制限時間（TIME_LIMIT_SEC > 0 のときだけ有効）。画面上部のバーが時間とともに減り、残り10秒以下で赤くなる ----
+  function startCountdown(seconds, onTimeout){
+    const total = seconds * 1000, t0 = Date.now();
+    const bar = document.getElementById('timeBar');
+    const fill = document.getElementById('timeFill');
+    const label = document.getElementById('timeLabel');
+    let done = false, intervalId = null;
     function render(){
-      badgeEl.textContent = '⏱ 残り' + remaining + '秒';
-      badgeEl.classList.toggle('warn', remaining <= 10);
+      const rem = Math.max(0, total - (Date.now() - t0));
+      fill.style.width = (rem / total * 100) + '%';
+      bar.classList.toggle('warn', rem <= 10000);
+      label.textContent = '残り ' + Math.ceil(rem / 1000) + ' 秒（制限時間 ' + seconds + ' 秒）';
+      if(rem <= 0) finish();
     }
-    render();
-    const intervalId = setInterval(function(){
-      remaining -= 1;
-      if(remaining <= 0){ render(); finish(); return; }
-      render();
-    }, 1000);
     function finish(){
       if(done) return;
       done = true;
       clearInterval(intervalId);
       onTimeout();
     }
+    render();
+    if(!done) intervalId = setInterval(render, 100);
     return { clear: function(){ if(done) return; done = true; clearInterval(intervalId); } };
   }
   function showTimeoutOverlay(callback){
@@ -472,9 +482,12 @@
     const t0 = Date.now();
 
     let html = '';
+    if(TIME_LIMIT_SEC > 0){
+      html += '<div class="time-bar-wrap"><div class="time-bar" id="timeBar"><div class="time-bar-fill" id="timeFill"></div></div>' +
+              '<div class="time-bar-label" id="timeLabel"></div></div>';
+    }
     html += '<div class="top"><span class="eyebrow">SITE 4 / ' + goodLabel + '（' + round + '回目）</span>' +
-            '<span class="progress">STEP ' + currentStepNo() + ' / ' + TOTAL_STEPS + '（候補' + size + '個）</span>' +
-            (TIME_LIMIT_SEC > 0 ? '<span class="timer-badge" id="timerBadge"></span>' : '') + '</div>';
+            '<span class="progress">STEP ' + currentStepNo() + ' / ' + TOTAL_STEPS + '（候補' + size + '個）</span></div>';
     html += '<h1>今回選ぶなら、どちらにしますか？</h1>';
     html += '<p class="desc">左側は今回の基準となる商品です。右側をスクロールして他の候補と見比べ、気になったものをクリックしてください。左側をクリックすれば、基準の商品を選んだことになります。' +
             (TIME_LIMIT_SEC > 0 ? '<b>制限時間は' + TIME_LIMIT_SEC + '秒です。</b>' : '') + '</p>';
@@ -525,7 +538,7 @@
     });
 
     if(TIME_LIMIT_SEC > 0){
-      timer = startCountdown(TIME_LIMIT_SEC, document.getElementById('timerBadge'), function(){
+      timer = startCountdown(TIME_LIMIT_SEC, function(){
         if(answered) return;
         answered = true;
         showTimeoutOverlay(function(){ commit(null, true); });
