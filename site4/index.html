@@ -517,8 +517,13 @@
         chosen = items.filter(function(x){ return String(x.p.id) === String(clickedId); })[0];
         type = chosenTypeOf(chosen);
       }
+      // 選んだ商品の推定効用（画面に出ていた内容での効用。基準財を選んだ場合は基準財の効用）。時間切れは null
+      let chosenU = null;
+      if(!timedOut){ chosenU = kept ? setup.sq.u : (chosen && chosen.u !== undefined ? chosen.u : null); }
       records.push({
         round: round, size: size, rtMs: rt, timedOut: !!timedOut, kept: kept,
+        chosenU: chosenU,
+        chosenNorm: chosenU === null ? null : (chosenU - setup.ev.min) / setup.ev.span,
         chosenId: timedOut ? null : String(clickedId),
         chosenName: timedOut ? '(回答なし/時間切れ)' : (kept ? SQ.name : (chosen ? chosen.p.name : '')),
         chosenType: type,
@@ -556,11 +561,20 @@
   // 親近感（馴染み）の質問：基準財について、5段階
   // ============================================================
   const famAnswers = {};
+  const satAnswers = {};
   function renderFamiliarity(){
     const order = [ {key:'SQ', p:SQ} ];
     famAnswers._order = 'SQ';
     let html = '<div class="fam-screen">' +
       '<h1 class="fam-title">最後に、商品についてお伺いします</h1>' +
+      '<h2 style="font-size:1.05rem;margin:18px 0 6px;">1. 選んだ商品への満足度</h2>' +
+      '<p class="fam-desc">実験全体を振り返って、' + goodLabel + 'を選んだ結果にどのくらい満足していますか。1回目・2回目それぞれについてお答えください。</p>' +
+      [ {k:'r1', t:'1回目の実験で選んだ商品への満足度'}, {k:'r2', t:'2回目の実験で選んだ商品への満足度'} ].map(function(q){
+        let h = '<div class="fam-card"><div class="fam-body"><div class="fam-name">' + q.t + '</div><div class="fam-scale">';
+        for(let n = 1; n <= 7; n++){ h += '<label><input type="radio" name="sat_' + q.k + '" value="' + n + '"><span>' + n + '</span></label>'; }
+        return h + '</div><div class="fam-ends"><span>1：まったく満足していない</span><span>7：とても満足している</span></div></div></div>';
+      }).join('') +
+      '<h2 style="font-size:1.05rem;margin:22px 0 6px;">2. 基準の商品への馴染み</h2>' +
       '<p class="fam-desc">これまでの実験で基準として表示されていた次の商品について、ふだんどのくらい馴染みがあるかをお答えください（見たことがある、買ったことがある、よく知っている、など）。</p>';
     order.forEach(function(x, idx){
       html += '<div class="fam-card"><div class="thumb"><img src="../images/' + x.p.image + '" alt=""></div>' +
@@ -579,7 +593,11 @@
         const el = document.querySelector('input[name="fam_' + k + '"]:checked');
         famAnswers[k] = el ? Number(el.value) : null;
       });
-      btn.disabled = !famAnswers.SQ;
+      ['r1','r2'].forEach(function(k){
+        const el = document.querySelector('input[name="sat_' + k + '"]:checked');
+        satAnswers[k] = el ? Number(el.value) : null;
+      });
+      btn.disabled = !(famAnswers.SQ && satAnswers.r1 && satAnswers.r2);
     }
     Array.from(document.querySelectorAll('.fam-scale input')).forEach(function(inp){ inp.addEventListener('change', update); });
     btn.addEventListener('click', function(){ update(); if(!btn.disabled) submitResults(); });
@@ -607,7 +625,8 @@
       aValues: DEF.attrs.map(function(a){ return labelOf(a) + ':' + (DEF.coding[a] === 'linear' ? A0.v[a] : (A0.v[a] >= 0 ? DEF.labels[a][A0.v[a]] : '水準外')); }),
       reserveIds: setup.reserve.map(function(p){ return String(p.id); }),
       slides: records,
-      familiarity: { SQ: famAnswers.SQ, order: famAnswers._order }
+      familiarity: { SQ: famAnswers.SQ, order: famAnswers._order },
+      satisfaction: { round1: satAnswers.r1, round2: satAnswers.r2 }   // 7段階（高いほど満足）
     };
     try{ sessionStorage.setItem('experiment_pendingCO_' + good, JSON.stringify(payload)); }catch(e){}
     sendCOPayload(payload);

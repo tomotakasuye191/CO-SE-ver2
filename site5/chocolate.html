@@ -431,7 +431,7 @@ const brandQuestions = [
   {q:'「フェレロ・ロシェ」はどこの国発祥のブランドですか。', opts:['フランス','イタリア','スイス','ベルギー'], correct:1}
 ];
 
-const purchaseFrequencyOptions = ['週に3回以上','週に1〜2回','月に2〜3回','月に1回程度','ほとんど購入しない'];
+const purchaseFrequencyOptions = ['ほとんど購入しない','月に1回程度','月に2〜3回','週に1〜2回','週に3回以上'];   // 並び順＝頻度が高くなる順（番号が大きいほど頻繁に購入）
 
 const state = {
   subjective: new Array(subjectiveItems.length).fill(null),
@@ -596,6 +596,7 @@ function buildRecord(){
     subjective_raw: state.subjective.slice(),
     subjective_avg: Number(subjAvg.toFixed(2)),
     purchase_frequency_index: state.purchaseFrequency,
+    purchase_frequency_score: state.purchaseFrequency + 1,   // 1〜5（5=週に3回以上、1=ほとんど購入しない）
     purchase_frequency_label: purchaseFrequencyOptions[state.purchaseFrequency],
     concept_answers: state.concept.slice(),
     concept_correct: conceptCorrect,
@@ -623,7 +624,7 @@ function sendToGAS(record, isAutoRetry){
     id: SYS.id,
     good: GOOD_CODE,
     subjectiveAvg: record.subjective_avg,
-    purchaseFrequencyIndex: record.purchase_frequency_index,
+    purchaseFrequencyScore: record.purchase_frequency_score,
     purchaseFrequencyLabel: record.purchase_frequency_label,
     conceptScore: record.concept_score,
     conceptTotal: record.concept_total,

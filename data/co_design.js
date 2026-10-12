@@ -282,8 +282,10 @@
     }
     var items = shuffle(chosen.concat(fill).map(function (p) {
       var ap = aprime.filter(function (x) { return String(x.id) === String(p.id); })[0];
-      return { p: p, overrides: ap ? ap.overrides : null, isAprime: !!ap, apOk: ap ? ap.ok : null };
-    }).concat([{ p: A, overrides: null, isAprime: false, isA: true }]), rng);
+      // u：画面に出る商品の推定効用（A'は表示値をAに揃えた後の効用）
+      return { p: p, overrides: ap ? ap.overrides : null, isAprime: !!ap, apOk: ap ? ap.ok : null,
+               u: ap ? ap.u : st.ev.byId[String(p.id)].u };
+    }).concat([{ p: A, overrides: null, isAprime: false, isA: true, u: ak.u }]), rng);
     return { items: items, aprime: aprime, A: A, aInfo: ak, borrowedIds: borrowed.map(function (p) { return String(p.id); }) };
   }
 
