@@ -632,6 +632,7 @@
         id: String(SQ.id), name: SQ.name, round: SQ.round, step: setup.sq.step,
         mods: Object.keys(setup.sq.mods).map(function(a){ return labelOf(a) + '→' + DEF.labels[a][setup.sq.mods[a]]; }),
         modCount: Object.keys(setup.sq.mods).length,
+        top2Match: setup.sq.top2Match, top2MatchedAttrs: (setup.sq.top2MatchedAttrs || []).map(labelOf),   // 重要2項目のうちA0と一致した数(0〜2)・属性
         norm: setup.sq.norm, u: setup.sq.u, rank: setup.sq.rank, gapRaw: setup.sq.gapRaw, gapNorm: setup.sq.gapNorm
       },
       aValues: DEF.attrs.map(function(a){ return labelOf(a) + ':' + (DEF.coding[a] === 'linear' ? A0.v[a] : (A0.v[a] >= 0 ? DEF.labels[a][A0.v[a]] : '水準外')); }),
