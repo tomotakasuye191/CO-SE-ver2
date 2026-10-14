@@ -23,7 +23,7 @@
     font-family:"Hiragino Sans","Yu Gothic",-apple-system,BlinkMacSystemFont,sans-serif;
     padding:12px 14px 24px;
   }
-  .wrap{ max-width:1440px; margin:0 auto; }
+  .wrap{ max-width:none; margin:0 auto; }
   .top{
     display:flex;
     justify-content:space-between;
@@ -31,12 +31,12 @@
     margin-bottom:3px;
   }
   .eyebrow{
-    font-size:10.5px;
+    font-size:12px;
     letter-spacing:.12em;
     color:var(--accent);
     font-weight:700;
   }
-  .progress{ font-size:10.5px; color:#7a8279; }
+  .progress{ font-size:12px; color:#5f685f; }
   .timer-badge{
     display:inline-block;
     margin-left:10px;
@@ -69,21 +69,25 @@
     box-shadow:0 6px 24px rgba(0,0,0,.2);
   }
   h1{
-    font-size:15px;
+    font-size:18px;
     line-height:1.5;
     margin:4px 0 4px;
     font-weight:700;
   }
   p.desc{
-    font-size:11.5px;
+    font-size:13.5px;
     line-height:1.6;
     color:#4b554e;
     margin:0 0 10px;
   }
+  /* 視線計測用：全カードを同じ大きさ（固定幅・正方形の画像枠・同じ高さ）にそろえる */
+  :root{ --card-w:160px; }
   .grid{
     display:grid;
-    grid-template-columns:repeat(auto-fill, minmax(96px, 1fr));
-    gap:6px;
+    grid-template-columns:repeat(auto-fill, var(--card-w));
+    grid-auto-rows:1fr;
+    gap:8px;
+    justify-content:start;
   }
   .slide-layout{
     display:flex;
@@ -91,7 +95,7 @@
     gap:14px;
   }
   .base-panel{
-    flex:0 0 148px;
+    flex:0 0 calc(var(--card-w) + 4px);
     position:sticky;
     top:12px;
   }
@@ -109,6 +113,7 @@
     .candidates-panel{ max-height:none; overflow-y:visible; width:100%; }
   }
   .card{
+    width:var(--card-w);
     background:#fff;
     border:1px solid var(--line);
     border-radius:3px;
@@ -125,29 +130,27 @@
   }
   .badge{
     display:inline-block;
-    font-size:8px;
+    font-size:11px;
     font-weight:700;
     color:#fff;
     background:var(--base-badge);
-    padding:1px 5px;
+    padding:2px 7px;
     border-radius:8px;
     margin-bottom:4px;
     align-self:flex-start;
   }
   .thumb{
+    position:relative;
     width:100%;
-    aspect-ratio:1/1;
+    height:0;
+    padding:0 0 100% 0;          /* aspect-ratioを使わず、古いブラウザでも正方形になる書き方 */
     background:#fff;
     border:1px solid #ece7db;
     border-radius:2px;
     overflow:hidden;
-    margin-bottom:3px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding:3px;
+    margin-bottom:5px;
   }
-  .thumb img{ width:100%; height:100%; object-fit:contain; }
+  .thumb img{ position:absolute; top:3px; left:3px; width:calc(100% - 6px); height:calc(100% - 6px); object-fit:contain; }
   .thumb.noimg{
     background:var(--accent-soft);
     font-size:9px;
@@ -157,15 +160,15 @@
     padding:4px;
   }
   .pname{
-    font-size:9px;
+    font-size:13px;
     font-weight:700;
-    line-height:1.3;
-    margin-bottom:3px;
-    min-height:2.1em;
+    line-height:1.35;
+    margin-bottom:4px;
+    min-height:2.7em;
   }
-  .attrs{ font-size:8.2px; color:#4b554e; line-height:1.4; }
+  .attrs{ font-size:12px; color:#2f3a34; line-height:1.45; }
   .attrs div{ display:flex; justify-content:space-between; gap:3px; }
-  .attrs span.k{ color:#8a9189; flex:0 0 auto; }
+  .attrs span.k{ color:#6b746d; flex:0 0 auto; }
   .attrs span.v{ text-align:right; }
 
   .intro-card .thumb{ cursor:pointer; }
@@ -504,6 +507,13 @@
     items.forEach(function(it){
       grid.appendChild(buildCard(it.p, { isBase:false, overrides:it.overrides }));
     });
+    // 視線計測のため、基準財を含む全カードの高さを最も高いカードに合わせる（大きさのばらつきをなくす）
+    (function(){
+      const cards = Array.from(document.querySelectorAll('#basePanel .card, #slideGrid .card'));
+      let h = 0;
+      cards.forEach(function(c){ h = Math.max(h, c.offsetHeight); });
+      cards.forEach(function(c){ c.style.height = h + 'px'; });
+    })();
 
     let answered = false, timer = null;
 
