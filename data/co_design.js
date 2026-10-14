@@ -114,7 +114,9 @@
     function make(step, it) {
       var normU = normOf(it.u);
       var rank = 1 + ev.u.filter(function (x) { return x > it.u + EPS; }).length;
-      return { sq: it.p, step: step, near: near(it.p.v), mods: it.mods || {}, u: it.u, norm: normU, rank: rank, poolSize: pool.length,
+      // 重要2項目(top2)のうち、A0と同じ水準のもの：一致数(0〜2)と一致した属性（0=両方異なる、2=両方一致）
+      var matched = top2.filter(function (a) { return sameClass(def, a, it.p.v, A.v); });
+      return { sq: it.p, step: step, near: near(it.p.v), top2Match: matched.length, top2MatchedAttrs: matched, mods: it.mods || {}, u: it.u, norm: normU, rank: rank, poolSize: pool.length,
                gapRaw: uA - it.u, gapNorm: 1 - normU };
     }
     var inBand = function (u) { return Math.abs(normOf(u) - TARGET) <= BAND + EPS; };
