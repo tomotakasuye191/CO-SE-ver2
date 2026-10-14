@@ -1,7 +1,7 @@
 /* =========================================================================
    CO実験の財選定ロジック（site4 用。ブラウザ／Node 両対応）
-   ・A    ：スライドごとに別の商品（毎回違う「合理的に最適な財」）。全商品プールの効用 上位8商品
-            （SLIDES=8）を、ランダムな順番で8スライドに1つずつ割り当てる。各スライドでは、そのAより
+   ・A    ：スライドごとに別の商品（毎回違う「合理的に最適な財」）。全商品プールの効用 上位4商品を、
+            ランダムな順番で提示数5/10/15/20に1つずつ割り当てる（1回目と2回目で同じ提示数なら同じA）。各スライドでは、そのAより
             効用の高い商品は一切出さないので、そのスライド内ではAが必ず最適。1位の商品は 'A0'（基準）
             としてSQ選定・top2の基準に使う。
    ・top2 ：重視度の高い2属性（パッケージと、プール内で全商品が同じ値の属性は除く）
@@ -13,7 +13,7 @@
   var E = (typeof require !== 'undefined' && typeof module !== 'undefined' && module.exports) ? require('./conjoint_engine.js') : root.ConjointEngine;
 
   var SIZES = [5, 10, 15, 20];
-  var APRIME_COUNT = { 5: 2, 10: 3, 15: 5, 20: 6 };
+  var APRIME_COUNT = { 5: 2, 10: 5, 15: 8, 20: 10 };
   var TARGET = 0.7, BAND = 0.15, EPS = 1e-9;
   var NEAR_MAX = 0.10; // SQ と A の数値トップ2属性の差が、水準範囲(最小〜最大)のこの割合以内なら「近い」
   var RESERVE_N = 3;
@@ -164,9 +164,7 @@
       return null;
     }
     var b;
-    // 0) まず「A に近い基準財」を優先（数値のトップ2属性の差が小さい）。ステップ1→2の順
-    useGap = numTop2.length > 0;
-    var rb = stepBoth(true); useGap = false; if (rb) return rb;
+    // 1)(2) トップ2属性が両方ともA0と水準が異なり、トレードオフがあり、効用が0.7に近い基準財（A0に近づける処理はしない）
     var rb2 = stepBoth(false); if (rb2) return rb2;
 
     // 3) 共有1：重視度の高い方のtop2属性だけ異なる実在商品で、帯内
@@ -214,12 +212,12 @@
   }
 
   // 被験者ごとの初期セットアップ（A0, 各スライドのA, top2, SQ, 予備財）
-  var N_SLIDES = SIZES.length * 2;
+  var N_SLIDES = SIZES.length;   // Aは提示数(5/10/15/20)ごとに1つ＝上位4商品。1回目と2回目の同じ提示数では同じA
   function setup(good, def, lu, pool, rng) {
     var ev = evalPool(def, lu, pool);
     var A0 = pickA(pool, ev);
     var top2 = pickTop2(def, lu, pool);
-    // 効用の高い順に上位 N_SLIDES 個 = 各スライドのA候補（同点はプール内の順）
+    // 効用の高い順に上位4個 = 提示数ごとのA候補（同点はプール内の順）
     var order = pool.map(function (p, i) { return { p: p, u: ev.u[i], i: i }; })
       .sort(function (x, y) { return (y.u - x.u) || (x.i - y.i); });
     var nA = Math.min(N_SLIDES, pool.length - 1);
@@ -229,7 +227,7 @@
     var ranked = top.map(function (x, k) {
       return { p: x.p, rank: k + 1, u: x.u, norm: (x.u - ev.min) / ev.span };
     });
-    var As = shuffle(ranked, rng); // スライド順（1回目の4枚→2回目の4枚）に割り当てる順番
+    var As = shuffle(ranked, rng); // As[k] = SIZES[k]（5/10/15/20）の提示数のA。ランダムな割り当て
     var aIds = ranked.map(function (x) { return String(x.p.id); });
     var excl = RESERVE_EXCLUDE[good] || [];
     var resCand = pool.filter(function (p) {
@@ -240,12 +238,12 @@
     return { ev: ev, A: A0, As: As, aIds: aIds, top2: top2, sq: s, reserve: reserve };
   }
 
-  // 各スライドの構成。slideIdx(0〜7)番目のスライドのA = st.As[slideIdx]
+  // 各スライドの構成。提示数 size のA = st.As[SIZES.indexOf(size)]（CO1とCO2で同じ）
   //   round=1: A + 1回目プールからランダム（A'なし）
   //   round=2: A + A' + 2回目プール（+予備財）からランダム
   //   そのAより効用の高い商品・他スライドのA・SQは出さない。足りなければ反対側のプールから借りる
   function composeSlide(def, lu, pool, st, round, size, rng, slideIdx) {
-    var ak = st.As[(slideIdx || 0) % st.As.length];
+    var ak = st.As[Math.max(0, SIZES.indexOf(size)) % st.As.length];
     var A = ak.p, SQ = st.sq.sq;
     var reserveIds = st.reserve.map(function (p) { return String(p.id); });
     function allowed(p) {

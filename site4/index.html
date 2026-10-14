@@ -441,7 +441,7 @@
   let phase = 'round1';
   let remaining1 = [], remaining2 = [];
   const records = [];   // 各スライドの記録
-  let slideNo = 0;      // 何枚目のスライドか（0始まり）。スライドごとに別のAを割り当てる
+  let slideNo = 0;      // 何枚目のスライドか（0始まり）。Aは提示数ごとに決まる（CO1・CO2で共通）
 
   function currentStepNo(){
     if(phase === 'round1') return 1 + (SIZES.length - remaining1.length);
@@ -542,6 +542,8 @@
         aId: String(aInfo.p.id), aName: aInfo.p.name, aRank: aInfo.rank,
         aNorm: setup.ev.byId[String(aInfo.p.id)].norm, aU: aInfo.u,
         borrowedIds: slide.borrowedIds,
+        aprimeExpected: round === 2 ? window.CODesign.APRIME_COUNT[size] : 0,
+        aprimeShort: (round === 2 && items.filter(function(x){ return x.isAprime; }).length < window.CODesign.APRIME_COUNT[size]) ? 1 : 0,
         aprimeIds: items.filter(function(x){ return x.isAprime; }).map(function(x){ return String(x.p.id); }),
         aprimeFallbackIds: items.filter(function(x){ return x.isAprime && x.apOk === false; }).map(function(x){ return String(x.p.id); })
       });
@@ -625,7 +627,7 @@
       top2: setup.top2, top2Labels: setup.top2.map(labelOf),
       poolSize: pool.length,
       A: { id: String(A0.id), name: A0.name, round: A0.round, norm: setup.ev.byId[String(A0.id)].norm, u: setup.ev.byId[String(A0.id)].u },   // プール内の最適財(1位)
-      aList: setup.As.map(function(x){ return { id: String(x.p.id), name: x.p.name, rank: x.rank, norm: x.norm, u: x.u }; }),   // スライド順のA
+      aList: setup.As.map(function(x, k){ return { size: SIZES[k], id: String(x.p.id), name: x.p.name, rank: x.rank, norm: x.norm, u: x.u }; }),   // 提示数(5/10/15/20)ごとのA（CO1・CO2で共通）
       SQ: {
         id: String(SQ.id), name: SQ.name, round: SQ.round, step: setup.sq.step,
         mods: Object.keys(setup.sq.mods).map(function(a){ return labelOf(a) + '→' + DEF.labels[a][setup.sq.mods[a]]; }),
