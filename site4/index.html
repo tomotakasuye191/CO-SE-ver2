@@ -531,7 +531,7 @@
       let chosenU = null;
       if(!timedOut){ chosenU = kept ? setup.sq.u : (chosen && chosen.u !== undefined ? chosen.u : null); }
       records.push({
-        round: round, size: size, rtMs: rt, timedOut: !!timedOut, kept: kept,
+        round: round, size: size, rtMs: (TIME_LIMIT_SEC > 0 ? rt : null), timedOut: !!timedOut, kept: kept,
         chosenU: chosenU,
         chosenNorm: chosenU === null ? null : (chosenU - setup.ev.min) / setup.ev.span,
         chosenId: timedOut ? null : String(clickedId),
