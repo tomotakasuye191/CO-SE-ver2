@@ -1,5 +1,5 @@
-/* 自動生成: コンジョイント設計・水準定義 (水準定義バージョン v2026-10-11a) */
-window.CONJOINT_VERSION="v2026-10-11a";
+/* 自動生成: コンジョイント設計・水準定義 (水準定義バージョン v2026-10-21a) */
+window.CONJOINT_VERSION="v2026-10-21a";
 window.CONJOINT_DEFS={
  "rice": {
   "good": "rice",
@@ -1165,12 +1165,12 @@ window.CONJOINT_DEFS={
   "num": {
    "price": {
     "values": [
-     70,
+     100,
      200,
-     540
+     400
     ],
-    "center": 270.0,
-    "scale": 235.0,
+    "center": 233.33333333333334,
+    "scale": 150.0,
     "unit": "円"
    },
    "amount": {
@@ -1206,9 +1206,9 @@ window.CONJOINT_DEFS={
   },
   "labels": {
    "price": [
-    "70円",
+    "100円",
     "200円",
-    "540円"
+    "400円"
    ],
    "amount": [
     "75g",
@@ -1738,12 +1738,12 @@ window.CONJOINT_DEFS={
   "num": {
    "price": {
     "values": [
-     20,
+     50,
      150,
-     400
+     250
     ],
-    "center": 190.0,
-    "scale": 190.0,
+    "center": 150.0,
+    "scale": 100.0,
     "unit": "円"
    },
    "cacao": {
@@ -1769,9 +1769,9 @@ window.CONJOINT_DEFS={
   },
   "labels": {
    "price": [
-    "20円",
+    "50円",
     "150円",
-    "400円"
+    "250円"
    ],
    "cacao": [
     "25%",
