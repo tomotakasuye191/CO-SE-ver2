@@ -28,6 +28,36 @@
     return a;
   }
 
+  // 水準外の産地（コンジョイントの3水準にない産地）：産地の文字列が完全に同じときだけ「同じ」と扱う。
+  // 水準外は効用0のまま、文字列ごとに別の負のコード（-1, -2, ...）を割り当てる。
+  var OUT_OF_LEVEL_ATTRS = { wine: [['origin', 'origin']], rice: [['origin', 'origin']] };
+
+  // 画面に出す表示をコンジョイントの水準に対応させる
+  //  ・ヨーグルトの栄養情報：v.nutri（0=表示なし／1=たんぱく質のみ／2=全部）に合わせて表示を変える
+  //  ・ヨーグルトのカロリー：100gあたりに統一（効用の計算値 v.cal と同じ基準）
+  function prepareDisplay(good, pool) {
+    (OUT_OF_LEVEL_ATTRS[good] || []).forEach(function (pair) {
+      var map = {}, n = 0;
+      pool.forEach(function (p) {
+        if (p.v[pair[0]] !== -1 && !(p.v[pair[0]] < 0)) return;
+        var s = String(p.attrs[pair[1]]);
+        if (!map.hasOwnProperty(s)) map[s] = -(++n);
+        p.v[pair[0]] = map[s];
+      });
+    });
+    if (good === 'yogurt') {
+      pool.forEach(function (p) {
+        var orig = String(p.attrs.nutrition || '');
+        if (p.v.nutri === 0) p.attrs.nutrition = '栄養成分表示なし';
+        else if (p.v.nutri === 1) p.attrs.nutrition = orig.split('/')[0];   // 「たんぱく質○g」だけ
+        // p.v.nutri === 2 は元の表示（たんぱく質／脂質／炭水化物／食塩相当量）のまま
+        if (!/100gあたり/.test(String(p.attrs.calorie))) {
+          p.attrs.calorie = (Math.round(p.v.cal * 10) / 10) + 'kcal（100gあたり）';
+        }
+      });
+    }
+  }
+
   // 商品プールを作る。PRODUCTS（1回目用）+ PRODUCTS_ROUND2（2回目用）と、水準データ PRODUCT_LEVELS を結合
   function buildPool(good, products, products2, levels) {
     var lv = {};
@@ -44,6 +74,7 @@
       });
     }
     add(products, 1); add(products2, 2);
+    prepareDisplay(good, pool);
     return pool;
   }
 
