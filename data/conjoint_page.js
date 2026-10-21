@@ -12,7 +12,7 @@
   var GOOD = DEF.good;
   var RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 16000];
   // コード（推定・記録ロジック）の版。計算や記録の方法を変えたら更新する。
-  var CODE_VERSION = 'site2_code_2026-10-11c';
+  var CODE_VERSION = 'site2_code_2026-10-21a';
 
   var P = new URLSearchParams(window.location.search);
   var SYS = {
@@ -35,8 +35,7 @@
   var N = DEF.design.length;
   var state = {
     current: 0, answers: new Array(N).fill(null),
-    shownAt: 0, rtFirst: new Array(N).fill(null), rtFinal: new Array(N).fill(null),
-    rtNext: new Array(N).fill(null), startedAtIso: '', startedAt: 0, lastResult: null
+    lastResult: null, attempts: []
   };
 
   function $(id) { return document.getElementById(id); }
@@ -75,13 +74,10 @@
     renderOption($('option-C'), s[2], 'C');
     Array.prototype.forEach.call(document.querySelectorAll('.option-card'), function (c) { c.classList.remove('selected'); });
     $('btn-next-set').disabled = true;
-    state.shownAt = Date.now();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   $('btn-start').addEventListener('click', function () {
-    state.startedAt = Date.now();
-    state.startedAtIso = new Date().toISOString();
     state.current = 0;
     renderSet();
     showScreen('screen-conjoint');
@@ -91,17 +87,14 @@
     card.addEventListener('click', function () {
       Array.prototype.forEach.call(document.querySelectorAll('.option-card'), function (c) { c.classList.remove('selected'); });
       card.classList.add('selected');
-      var i = state.current, now = Date.now() - state.shownAt;
+      var i = state.current;
       state.answers[i] = parseInt(card.dataset.choice, 10);
-      if (state.rtFirst[i] === null) state.rtFirst[i] = now;
-      state.rtFinal[i] = now;
       $('btn-next-set').disabled = false;
     });
   });
 
   $('btn-next-set').addEventListener('click', function () {
     if (state.answers[state.current] === null) return;
-    state.rtNext[state.current] = Date.now() - state.shownAt;
     state.current += 1;
     if (state.current < N) renderSet(); else finish();
   });
@@ -120,8 +113,6 @@
       action: 'submitConjoint', id: SYS.id, good: GOOD, gender: SYS.gender, age: SYS.age,
       surveyId: DEF.surveyId, levelVersion: window.CONJOINT_VERSION, lambda: E.LAMBDA,
       choices: state.answers.map(function (i) { return String.fromCharCode(65 + i); }),
-      rtFinalMs: state.rtFinal, rtFirstMs: state.rtFirst, rtNextMs: state.rtNext,
-      totalSec: r((Date.now() - state.startedAt) / 1000, 1),
       attentionCheck1: ac1, attentionCheck2: ac2,
       attrs: DEF.attrs,
       ranking: an.ranking.map(function (x) { return { attr: x.attr, label: x.label, range: r(x.range, 5), pct: r(x.pct, 3), utils: x.utils.map(function (u) { return r(u, 5); }) }; }),
@@ -137,7 +128,7 @@
       estimation: { iterations: an.est.iterations, converged: an.est.converged, lastDelta: an.est.lastDelta,
                     maxAbsBeta: r(Math.max.apply(null, an.beta.map(Math.abs)), 6), maxAbsGrad: an.fit.maxAbsGrad },
       allSameChoice: (function () { var s = {}; state.answers.forEach(function (x) { s[x] = 1; }); return Object.keys(s).length === 1; })(),
-      startedAt: state.startedAtIso, submittedAt: new Date().toISOString()
+      submittedAt: new Date().toISOString()   // 診断用。GASは記録しない
     };
     return { payload: payload, lu: lu };
   }
@@ -158,35 +149,99 @@
     return CFG.BASE_URL + 'site4/index.html?' + q.toString();
   }
 
+  // ---- 送信と原因の特定 ----
+  // 失敗するたびに「何が・どの段階で・何秒で」失敗したかを state.attempts に貯め、
+  // ・画面に原因を出し、・console に出し、・（GASに届く場合は）エラーログシートへ送る。
+  function nowJst() {
+    var d = new Date(Date.now() + 9 * 3600 * 1000);
+    return d.toISOString().replace('T', ' ').slice(0, 19) + ' JST';
+  }
+
+  function diagText(res) {
+    var lines = [
+      '【原因の情報】この内容を班員（実験担当）に伝えてください',
+      '日時: ' + nowJst(),
+      'ID: ' + SYS.id + ' / 財: ' + GOOD + ' / 版: ' + (CODE_VERSION || ''),
+      'オンライン表示: ' + (navigator.onLine ? 'はい' : 'いいえ') + ' / 端末: ' + (navigator.userAgent || '').slice(0, 120),
+      '送信回数: ' + state.attempts.length
+    ];
+    state.attempts.forEach(function (a, i) {
+      lines.push((i + 1) + '回目: ' + a.kind + ' / ' + a.ms + 'ms / ' + a.message);
+    });
+    return lines.join('\n');
+  }
+
+  function showDiag(res) {
+    var box = $('submit-diag');
+    if (!box) {
+      box = document.createElement('pre');
+      box.id = 'submit-diag';
+      box.style.cssText = 'white-space:pre-wrap;word-break:break-all;text-align:left;font-size:12px;background:#f4f4f4;border-radius:8px;padding:10px;margin:12px 0;user-select:all;';
+      $('submit-status').parentNode.insertBefore(box, $('btn-retry-submit'));
+    }
+    box.textContent = diagText(res);
+  }
+
+  function reportToServer(res) {
+    // 失敗の原因をGASのエラーログへ送る（GASに届かなければ何もしない）
+    var last = state.attempts[state.attempts.length - 1] || {};
+    try {
+      fetch(CFG.GAS_URL, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'logClientError', failedAction: 'submitConjoint', id: SYS.id, good: GOOD,
+          kind: last.kind || '', message: last.message || '', detail: diagText(res), elapsedMs: last.ms, errorId: last.errorId || '' })
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
+  function fail(res, attempt, t0, kind, message, errorId) {
+    state.attempts.push({ kind: kind, message: message, ms: Date.now() - t0, errorId: errorId || '' });
+    try { console.error('[conjoint送信失敗]', kind, message, 'attempt=' + attempt); } catch (e) {}
+    retryOrFail(res, attempt, kind + '：' + message);
+  }
+
   function send(res, attempt) {
     var label = attempt > 0 ? '（自動再送信 ' + attempt + '/' + RETRY_DELAYS_MS.length + ' 回目…）' : '';
     $('submit-status').textContent = '回答を記録しています…' + label;
+    var t0 = Date.now(), httpStatus = '';
     fetch(CFG.GAS_URL, {
       method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(res.payload)
-    }).then(function (resp) { return resp.text(); })
+    }).then(function (resp) { httpStatus = resp.status; return resp.text(); })
       .then(function (text) {
-        var d; try { d = JSON.parse(text); } catch (e) { throw new Error('予期しない応答'); }
-        if (d.status !== 'ok') throw new Error(d.message || '記録に失敗しました');
+        var d;
+        try { d = JSON.parse(text); }
+        catch (e) {
+          // GASが「JSONではなくHTML」を返した＝権限・割当上限・デプロイ未更新など
+          fail(res, attempt, t0, 'GASの応答が想定外(HTTP ' + httpStatus + ')', (text || '').replace(/\s+/g, ' ').slice(0, 160)); return;
+        }
+        if (d.status !== 'ok') { fail(res, attempt, t0, 'GASがエラーを返した', d.message || '(メッセージなし)', d.errorId); return; }
+        if (d.warnings && d.warnings.length) { try { console.warn('[conjoint] 一部の保存に失敗(回答は保存済み):', d.warnings); } catch (e) {} }
         try { sessionStorage.setItem('experiment_lu_' + GOOD, JSON.stringify(res.lu)); } catch (e) {}
         $('submit-status').textContent = '記録が完了しました。実験画面に移動します…';
         window.location.href = nextUrl(res.lu);
       })
-      .catch(function () { retryOrFail(res, attempt); });
+      .catch(function (err) {
+        fail(res, attempt, t0, '通信できなかった(fetch失敗)', (err && err.message) || String(err));
+      });
   }
 
-  function retryOrFail(res, attempt) {
+  function retryOrFail(res, attempt, why) {
     if (attempt < RETRY_DELAYS_MS.length) {
       var delay = RETRY_DELAYS_MS[attempt];
-      $('submit-status').textContent = '通信に失敗しました。' + Math.round(delay / 1000) + '秒後に自動で再送信します…';
+      $('submit-status').textContent = '失敗しました（' + why + '）。' + Math.round(delay / 1000) + '秒後に自動で再送信します…';
       setTimeout(function () { send(res, attempt + 1); }, delay);
       return;
     }
     $('submit-status').textContent = '回答の記録に失敗しました。お手数ですが下のボタンからもう一度お試しください。';
+    showDiag(res);
+    reportToServer(res);
     $('btn-retry-submit').style.display = 'block';
   }
 
   $('btn-retry-submit').addEventListener('click', function () {
     $('btn-retry-submit').style.display = 'none';
+    var box = $('submit-diag'); if (box) box.textContent = '';
+    state.attempts = [];
     send(state.lastResult, 0);
   });
 
