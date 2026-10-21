@@ -30,6 +30,7 @@
 
   // 水準外の産地（コンジョイントの3水準にない産地）：産地の文字列が完全に同じときだけ「同じ」と扱う。
   // 水準外は効用0のまま、文字列ごとに別の負のコード（-1, -2, ...）を割り当てる。
+  var PRICE_CLAMP_GOODS = ['yogurt', 'chocolate', 'wine'];
   var OUT_OF_LEVEL_ATTRS = { wine: [['origin', 'origin']], rice: [['origin', 'origin']] };
 
   // 画面に出す表示をコンジョイントの水準に対応させる
@@ -45,6 +46,18 @@
         p.v[pair[0]] = map[s];
       });
     });
+    // 価格がコンジョイントの価格水準の範囲外の商品は、表示価格を範囲の端の値に直す（画面の価格と効用の計算を一致させる）
+    //   ヨーグルト 100〜400円、チョコレート 50〜250円、ワイン 3,000〜70,000円。元の価格は p.priceOrig に残す。
+    if (PRICE_CLAMP_GOODS.indexOf(good) !== -1 && root.CONJOINT_DEFS && root.CONJOINT_DEFS[good]) {
+      var lv = root.CONJOINT_DEFS[good].num.price.values;
+      pool.forEach(function (p) {
+        var orig = Number(p.attrs.price);
+        if (isNaN(orig)) return;
+        var adj = Math.min(Math.max(orig, lv[0]), lv[2]);
+        if (adj !== orig) { p.priceOrig = orig; p.attrs.price = adj; }
+        p.v.price = adj;
+      });
+    }
     if (good === 'yogurt') {
       pool.forEach(function (p) {
         var orig = String(p.attrs.nutrition || '');
