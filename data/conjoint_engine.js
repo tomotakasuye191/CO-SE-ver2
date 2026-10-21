@@ -209,7 +209,7 @@
   // 属性1つ分の部分効用。v = 商品の水準データ（数値=実測値、カテゴリ=水準index、-1=水準外→0）
   function partialUtility(def, lu, attr, value) {
     if (def.coding[attr] === 'linear') return interpNumeric(def, lu, attr, value);
-    if (value === -1 || value === null || value === undefined) return 0;
+    if (value === null || value === undefined || value < 0) return 0;   // 負の値＝水準外（効用0）
     return lu[attr][value];
   }
 
