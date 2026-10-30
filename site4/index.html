@@ -240,7 +240,7 @@
 
   .fam-screen{ max-width:640px; margin:40px auto; }
   .fam-card{ background:#fff; border:1px solid var(--line); border-radius:3px; padding:16px; margin-bottom:14px; display:flex; gap:14px; align-items:center; }
-  .fam-card .thumb{ flex:0 0 110px; width:110px; margin:0; cursor:default; }
+  .fam-card .thumb{ flex:0 0 110px; width:110px; height:110px; padding:0; margin:0; cursor:default; align-self:flex-start; }
   .fam-body{ flex:1; min-width:0; }
   .fam-name{ font-size:13px; font-weight:700; margin-bottom:8px; line-height:1.4; }
   .fam-scale{ display:flex; gap:6px; flex-wrap:wrap; }
@@ -248,6 +248,24 @@
   .fam-scale input{ margin:4px 0 2px; }
   .fam-ends{ display:flex; justify-content:space-between; font-size:10.5px; color:#7a8279; margin-top:4px; }
   .fam-title{ font-size:17px; font-weight:700; margin:0 0 8px; }
+  .fam-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px; }
+  .fam-head .fam-name{ margin-bottom:0; }
+  button.recall-btn{ flex:0 0 auto; font-size:12px; font-weight:700; color:var(--accent); background:#fff; border:1px solid var(--accent); border-radius:2px; padding:6px 12px; cursor:pointer; white-space:nowrap; }
+  button.recall-btn:hover{ background:var(--accent-soft); }
+  .recall-overlay{ position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(30,36,32,.55); z-index:100; display:none; align-items:center; justify-content:center; padding:16px; }
+  .recall-overlay.open{ display:flex; }
+  .recall-modal{ background:var(--paper); border-radius:4px; width:100%; max-width:760px; max-height:calc(100vh - 32px); overflow-y:auto; padding:16px 18px 18px; box-shadow:0 8px 30px rgba(0,0,0,.25); }
+  .recall-top{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:6px; }
+  .recall-top h2{ font-size:16px; margin:0; }
+  button.recall-close{ font-size:13px; font-weight:700; color:#fff; background:var(--accent); border:none; border-radius:2px; padding:7px 16px; cursor:pointer; }
+  .recall-desc{ font-size:12.5px; color:#4b554e; margin:0 0 12px; line-height:1.6; }
+  .recall-grid{ display:flex; flex-wrap:wrap; gap:12px; }
+  .recall-item{ display:flex; flex-direction:column; gap:5px; width:var(--card-w); }
+  .recall-item .cap{ font-size:12px; font-weight:700; color:#4b554e; min-height:2.9em; line-height:1.45; }
+  .recall-item .cap .sub{ display:block; font-weight:400; color:#b0742a; }
+  .recall-item .card{ cursor:default; }
+  .recall-item .card:hover{ border-color:var(--line); transform:none; }
+  .recall-none{ width:var(--card-w); border:1px dashed var(--line); border-radius:3px; padding:14px 8px; font-size:12px; color:#6b746d; text-align:center; background:#fff; }
   .fam-desc{ font-size:13px; line-height:1.7; color:#4b554e; margin:0 0 16px; }
   button.primary{ padding:12px 28px; font-size:14px; font-weight:700; border:none; border-radius:2px; background:var(--accent); color:#fff; cursor:pointer; }
   button.primary:disabled{ background:#b9c3be; cursor:not-allowed; }
@@ -441,6 +459,8 @@
   let phase = 'round1';
   let remaining1 = [], remaining2 = [];
   const records = [];   // 各スライドの記録
+  const choiceLog = [];   // 最後のページの「選んだ財を確認する」用（何を選んだか）
+  const recallViews = { round1: 0, round2: 0 };   // 「選んだ財を確認する」を開いた回数（記録用）
   let slideNo = 0;      // 何枚目のスライドか（0始まり）。Aは提示数ごとに決まる（CO1・CO2で共通）
 
   function currentStepNo(){
@@ -547,6 +567,9 @@
         aprimeIds: items.filter(function(x){ return x.isAprime; }).map(function(x){ return String(x.p.id); }),
         aprimeFallbackIds: items.filter(function(x){ return x.isAprime && x.apOk === false; }).map(function(x){ return String(x.p.id); })
       });
+      choiceLog.push({ round: round, size: size, timedOut: !!timedOut, kept: kept,
+        product: timedOut ? null : (kept ? SQ : (chosen ? chosen.p : null)),
+        overrides: timedOut ? null : (kept ? sqOverrides : (chosen ? chosen.overrides : null)) });
       nextSlide();
     }
 
@@ -574,6 +597,54 @@
   // ============================================================
   const famAnswers = {};
   const satAnswers = {};
+
+  // 「選んだ財を確認する」：その回の実験で、候補の数(5/10/15/20)ごとに選んだ商品を、画像と情報つきで出す
+  function closeRecall(){
+    const ov = document.getElementById('recallOverlay');
+    if(ov) ov.classList.remove('open');
+  }
+  function openRecall(round){
+    recallViews['round' + round] += 1;
+    let ov = document.getElementById('recallOverlay');
+    if(!ov){
+      ov = document.createElement('div');
+      ov.id = 'recallOverlay';
+      ov.className = 'recall-overlay';
+      document.body.appendChild(ov);
+      ov.addEventListener('click', function(e){ if(e.target === ov) closeRecall(); });
+      document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeRecall(); });
+    }
+    ov.innerHTML = '<div class="recall-modal"><div class="recall-top"><h2>' + round + '回目の実験で選んだ' + goodLabel + '</h2>' +
+      '<button type="button" class="recall-close" id="recallClose">閉じる</button></div>' +
+      '<p class="recall-desc">候補の数ごとに、そのとき選んだ商品です。</p><div class="recall-grid" id="recallGrid"></div></div>';
+    const grid = document.getElementById('recallGrid');
+    SIZES.slice().sort(function(a, b){ return a - b; }).forEach(function(size){
+      const rec = choiceLog.filter(function(x){ return x.round === round && x.size === size; })[0];
+      const item = document.createElement('div');
+      item.className = 'recall-item';
+      const cap = document.createElement('div');
+      cap.className = 'cap';
+      cap.textContent = '候補' + size + '個のとき';
+      if(rec && rec.kept){ const sub = document.createElement('span'); sub.className = 'sub'; sub.textContent = '基準の商品を選びました'; cap.appendChild(sub); }
+      item.appendChild(cap);
+      if(rec && rec.product){
+        item.appendChild(buildCard(rec.product, { isBase:false, overrides:rec.overrides }));
+      } else {
+        const none = document.createElement('div');
+        none.className = 'recall-none';
+        none.textContent = '選択なし（時間切れ）';
+        item.appendChild(none);
+      }
+      grid.appendChild(item);
+    });
+    document.getElementById('recallClose').addEventListener('click', closeRecall);
+    ov.classList.add('open');
+    // カードの高さをそろえる
+    const cards = Array.from(grid.querySelectorAll('.card'));
+    let h = 0;
+    cards.forEach(function(c){ h = Math.max(h, c.offsetHeight); });
+    cards.forEach(function(c){ c.style.height = h + 'px'; });
+  }
   function renderFamiliarity(){
     const order = [ {key:'SQ', p:SQ} ];
     famAnswers._order = 'SQ';
@@ -582,7 +653,8 @@
       '<h2 style="font-size:1.05rem;margin:18px 0 6px;">1. 選んだ商品への満足度</h2>' +
       '<p class="fam-desc">実験全体を振り返って、' + goodLabel + 'を選んだ結果にどのくらい満足していますか。1回目・2回目それぞれについてお答えください。</p>' +
       [ {k:'r1', t:'1回目の実験で選んだ商品への満足度'}, {k:'r2', t:'2回目の実験で選んだ商品への満足度'} ].map(function(q){
-        let h = '<div class="fam-card"><div class="fam-body"><div class="fam-name">' + q.t + '</div><div class="fam-scale">';
+        let h = '<div class="fam-card"><div class="fam-body"><div class="fam-head"><div class="fam-name">' + q.t + '</div>' +
+          '<button type="button" class="recall-btn" data-round="' + (q.k === 'r1' ? 1 : 2) + '">選んだ財を確認する</button></div><div class="fam-scale">';
         for(let n = 1; n <= 7; n++){ h += '<label><input type="radio" name="sat_' + q.k + '" value="' + n + '"><span>' + n + '</span></label>'; }
         return h + '</div><div class="fam-ends"><span>1：まったく満足していない</span><span>7：とても満足している</span></div></div></div>';
       }).join('') +
@@ -599,6 +671,9 @@
     });
     html += '<div style="text-align:center;margin-top:18px;"><button class="primary" id="famSubmit" disabled>回答を送信して次へ</button></div></div>';
     app.innerHTML = html;
+    Array.from(document.querySelectorAll('.recall-btn')).forEach(function(b){
+      b.addEventListener('click', function(){ openRecall(Number(b.dataset.round)); });
+    });
     const btn = document.getElementById('famSubmit');
     function update(){
       ['SQ'].forEach(function(k){
@@ -639,7 +714,8 @@
       reserveIds: setup.reserve.map(function(p){ return String(p.id); }),
       slides: records,
       familiarity: { SQ: famAnswers.SQ, order: famAnswers._order },
-      satisfaction: { round1: satAnswers.r1, round2: satAnswers.r2 }   // 7段階（高いほど満足）
+      satisfaction: { round1: satAnswers.r1, round2: satAnswers.r2 },   // 7段階（高いほど満足）
+      recallViews: { round1: recallViews.round1, round2: recallViews.round2 }   // 「選んだ財を確認する」を開いた回数
     };
     try{ sessionStorage.setItem('experiment_pendingCO_' + good, JSON.stringify(payload)); }catch(e){}
     sendCOPayload(payload);
