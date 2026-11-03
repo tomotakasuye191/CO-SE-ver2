@@ -299,7 +299,12 @@
   const CFG = window.EXP_CONFIG;
   const GAS_URL = CFG.GAS_URL;
   const BASE_URL = CFG.BASE_URL;
-  const TIME_LIMIT_SEC = Number(CFG.CO_TIME_LIMIT_SEC) || 0;   // 0 = 制限なし(ver2) / 25 = 時間制限あり(ver3)
+  // 制限時間：CO_TIME_PER_ITEM_SEC > 0 のとき「提示枚数 × この秒数」（ver3は5。5枚=25秒・10枚=50秒・15枚=75秒・20枚=100秒）。
+  // 未設定のときは従来の固定秒数 CO_TIME_LIMIT_SEC を使う。どちらも 0 なら制限なし(ver2)。
+  const TIME_PER_ITEM_SEC = Number(CFG.CO_TIME_PER_ITEM_SEC) || 0;
+  const TIME_FIXED_SEC = Number(CFG.CO_TIME_LIMIT_SEC) || 0;
+  function limitSecFor(n){ return TIME_PER_ITEM_SEC > 0 ? n * TIME_PER_ITEM_SEC : TIME_FIXED_SEC; }
+  const TIME_LIMIT_SEC = TIME_PER_ITEM_SEC > 0 ? TIME_PER_ITEM_SEC : TIME_FIXED_SEC;   // 記録用（GASへ送る設定値）
 
   const GOOD_LABELS = { yogurt:'ヨーグルト', rice:'お米', wine:'ワイン', chocolate:'チョコレート' };
 
@@ -506,9 +511,10 @@
     const aInfo = slide.aInfo;   // このスライドのA（順位・効用つき）
     const items = slide.items;
     const t0 = Date.now();
+    const limitSec = limitSecFor(size);   // このスライドの制限時間（秒）。0 = 制限なし
 
     let html = '';
-    if(TIME_LIMIT_SEC > 0){
+    if(limitSec > 0){
       html += '<div class="time-bar-wrap"><div class="time-bar" id="timeBar"><div class="time-bar-fill" id="timeFill"></div></div>' +
               '<div class="time-bar-label" id="timeLabel"></div></div>';
     }
@@ -516,7 +522,7 @@
             '<span class="progress">STEP ' + currentStepNo() + ' / ' + TOTAL_STEPS + '（候補' + size + '個）</span></div>';
     html += '<h1>今回選ぶなら、どちらにしますか？</h1>';
     html += '<p class="desc">左側は今回の基準となる商品です。右側をスクロールして他の候補と見比べ、気になったものをクリックしてください。左側をクリックすれば、基準の商品を選んだことになります。' +
-            (TIME_LIMIT_SEC > 0 ? '<b>制限時間は' + TIME_LIMIT_SEC + '秒です。</b>' : '') + '</p>';
+            (limitSec > 0 ? '<b>制限時間は' + limitSec + '秒です。</b>' : '') + '</p>';
     html += '<div class="slide-layout"><div class="base-panel" id="basePanel"></div>' +
             '<div class="candidates-panel"><div class="grid" id="slideGrid"></div></div></div>';
     app.innerHTML = html;
@@ -551,7 +557,7 @@
       let chosenU = null;
       if(!timedOut){ chosenU = kept ? setup.sq.u : (chosen && chosen.u !== undefined ? chosen.u : null); }
       records.push({
-        round: round, size: size, rtMs: (TIME_LIMIT_SEC > 0 ? rt : null), timedOut: !!timedOut, kept: kept,
+        round: round, size: size, rtMs: (limitSec > 0 ? rt : null), limitSec: limitSec, timedOut: !!timedOut, kept: kept,
         chosenU: chosenU,
         chosenNorm: chosenU === null ? null : (chosenU - setup.ev.min) / setup.ev.span,
         chosenId: timedOut ? null : String(clickedId),
@@ -583,8 +589,8 @@
       });
     });
 
-    if(TIME_LIMIT_SEC > 0){
-      timer = startCountdown(TIME_LIMIT_SEC, function(){
+    if(limitSec > 0){
+      timer = startCountdown(limitSec, function(){
         if(answered) return;
         answered = true;
         showTimeoutOverlay(function(){ commit(null, true); });
@@ -698,7 +704,7 @@
   function submitResults(){
     const payload = {
       action: 'submitCO', schema: 2, id: id, good: good,
-      levelVersion: window.CONJOINT_VERSION, timeLimitSec: TIME_LIMIT_SEC,
+      levelVersion: window.CONJOINT_VERSION, timeLimitSec: (TIME_PER_ITEM_SEC > 0 ? TIME_PER_ITEM_SEC + '秒×提示枚数' : TIME_FIXED_SEC),
       top2: setup.top2, top2Labels: setup.top2.map(labelOf),
       poolSize: pool.length,
       A: { id: String(A0.id), name: A0.name, round: A0.round, norm: setup.ev.byId[String(A0.id)].norm, u: setup.ev.byId[String(A0.id)].u },   // プール内の最適財(1位)
