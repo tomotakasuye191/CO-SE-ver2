@@ -255,6 +255,8 @@
     background: var(--accent-soft);
     font-weight: 700;
   }
+  .option-card.dontknow { border-style: dashed; color: var(--ink-soft); }
+  .option-card.dontknow.selected { color: inherit; }
 
   .result-badges { display: flex; gap: 8px; justify-content: center; margin-bottom: 18px; flex-wrap: wrap; }
   .badge {
@@ -342,7 +344,7 @@
       <div class="progress-dot current"></div>
     </div>
     <div class="card">
-      <p class="muted">ヨーグルトについての知識を問う設問です。</p>
+      <p class="muted">ヨーグルトについての知識を問う設問です。分からない場合は、推測で答えず「分からない」を選んでください。</p>
       <div id="objective-list"></div>
       <div class="hint" id="objective-hint"></div>
       <div class="btn-row">
@@ -554,6 +556,20 @@ function buildMCBlock(label, item, answerArr, idx, group){
     });
     list.appendChild(card);
   });
+  // 「分からない」（当てずっぽうの回答を防ぐため）。値は選択肢の数（= 正解にならない番号）。誤答と同じく0点
+  (function(){
+    const oi = item.opts.length;
+    const card = document.createElement('div');
+    card.className = 'option-card dontknow';
+    if(answerArr[idx] === oi) card.classList.add('selected');
+    card.textContent = '分からない';
+    card.addEventListener('click', ()=>{
+      answerArr[idx] = oi;
+      document.getElementById('objective-hint').textContent = '';
+      renderObjectivePage();
+    });
+    list.appendChild(card);
+  })();
 
   block.appendChild(num);
   block.appendChild(text);
@@ -606,6 +622,8 @@ function buildRecord(){
     brand_correct: brandCorrect,
     brand_score: brandCorrect.reduce((a,b)=>a+b,0),
     brand_total: brandQuestions.length,
+    concept_dontknow: state.concept.filter((a,i)=> a === conceptQuestions[i].opts.length).length,
+    brand_dontknow: state.brand.filter((a,i)=> a === brandQuestions[i].opts.length).length,
     objective_total_score: conceptCorrect.reduce((a,b)=>a+b,0) + brandCorrect.reduce((a,b)=>a+b,0)
   };
 }
@@ -632,6 +650,9 @@ function sendToGAS(record, isAutoRetry){
     brandTotal: record.brand_total,
     objectiveScore: record.objective_total_score,
     objectiveTotal: record.concept_total + record.brand_total,
+    conceptDontKnow: record.concept_dontknow,   // 「分からない」の数（概念知識）
+    brandDontKnow: record.brand_dontknow,       // 「分からない」の数（ブランド知識）
+    dontKnowCount: record.concept_dontknow + record.brand_dontknow,
   };
 
   fetch(GAS_URL, {
