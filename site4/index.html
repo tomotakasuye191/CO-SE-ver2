@@ -247,6 +247,16 @@
   .fam-scale label{ display:flex; flex-direction:column; align-items:center; font-size:11px; color:#4b554e; cursor:pointer; min-width:44px; }
   .fam-scale input{ margin:4px 0 2px; }
   .fam-ends{ display:flex; justify-content:space-between; font-size:10.5px; color:#7a8279; margin-top:4px; }
+  .rank-box{ margin-top:14px; padding-top:12px; border-top:1px dashed var(--line); }
+  .rank-q{ font-size:12.5px; font-weight:700; color:#2f3a34; line-height:1.55; }
+  .rank-sub{ font-size:11px; color:#7a8279; margin:2px 0 8px; }
+  .rank-chips{ display:flex; flex-wrap:wrap; gap:8px; }
+  button.rank-chip{ position:relative; font-size:12.5px; padding:8px 12px; border:1px solid var(--line); border-radius:3px; background:#fff; color:#2f3a34; cursor:pointer; }
+  button.rank-chip.on{ border-color:var(--accent); background:#eef4ef; font-weight:700; padding-right:46px; }
+  button.rank-chip .rk{ display:none; position:absolute; right:6px; top:50%; transform:translateY(-50%); background:var(--accent); color:#fff; font-size:11px; font-weight:700; padding:2px 7px; border-radius:10px; }
+  button.rank-chip.on .rk{ display:inline-block; }
+  button.rank-chip:disabled{ opacity:.45; cursor:not-allowed; }
+  .rank-now{ font-size:12px; color:var(--accent); font-weight:700; margin-top:8px; min-height:1.4em; }
   .fam-title{ font-size:17px; font-weight:700; margin:0 0 8px; }
   .fam-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px; }
   .fam-head .fam-name{ margin-bottom:0; }
@@ -603,6 +613,8 @@
   // ============================================================
   const famAnswers = {};
   const satAnswers = {};
+  const rankAnswers = { r1: [], r2: [] };   // 選ぶとき重視した点（属性キー。タップした順＝重視順、最大3つ）
+  const RANK_MAX = 3;
 
   // 「選んだ財を確認する」：その回の実験で、候補の数(5/10/15/20)ごとに選んだ商品を、画像と情報つきで出す
   function closeRecall(){
@@ -662,7 +674,13 @@
         let h = '<div class="fam-card"><div class="fam-body"><div class="fam-head"><div class="fam-name">' + q.t + '</div>' +
           '<button type="button" class="recall-btn" data-round="' + (q.k === 'r1' ? 1 : 2) + '">選んだ財を確認する</button></div><div class="fam-scale">';
         for(let n = 1; n <= 7; n++){ h += '<label><input type="radio" name="sat_' + q.k + '" value="' + n + '"><span>' + n + '</span></label>'; }
-        return h + '</div><div class="fam-ends"><span>1：まったく満足していない</span><span>7：とても満足している</span></div></div></div>';
+        h += '</div><div class="fam-ends"><span>1：まったく満足していない</span><span>7：とても満足している</span></div>';
+        h += '<div class="rank-box" data-rk="' + q.k + '"><div class="rank-q">この商品を選ぶとき、何を重視しましたか。</div>' +
+             '<div class="rank-sub">重視した項目を、重視した順に最大' + RANK_MAX + 'つまでタップしてください（もう一度タップすると取り消せます）。</div><div class="rank-chips">';
+        DEF.attrs.forEach(function(a){
+          h += '<button type="button" class="rank-chip" data-attr="' + a + '">' + escapeHtml(DEF.attrLabels[a]) + '<span class="rk"></span></button>';
+        });
+        return h + '</div><div class="rank-now"></div></div></div></div>';
       }).join('') +
       '<h2 style="font-size:1.05rem;margin:22px 0 6px;">2. 基準の商品への馴染み</h2>' +
       '<p class="fam-desc">これまでの実験で基準として表示されていた次の商品について、ふだんどのくらい馴染みがあるかをお答えください（見たことがある、買ったことがある、よく知っている、など）。</p>';
@@ -681,6 +699,29 @@
       b.addEventListener('click', function(){ openRecall(Number(b.dataset.round)); });
     });
     const btn = document.getElementById('famSubmit');
+    function renderRank(k){
+      const box = document.querySelector('.rank-box[data-rk="' + k + '"]');
+      const sel = rankAnswers[k];
+      Array.from(box.querySelectorAll('.rank-chip')).forEach(function(c){
+        const pos = sel.indexOf(c.dataset.attr);
+        c.classList.toggle('on', pos >= 0);
+        c.querySelector('.rk').textContent = pos >= 0 ? (pos + 1) + '位' : '';
+        c.disabled = pos < 0 && sel.length >= RANK_MAX;
+      });
+      box.querySelector('.rank-now').textContent = sel.length ? ('重視した順：' + sel.map(function(a, i){ return (i + 1) + '位 ' + DEF.attrLabels[a]; }).join(' → ')) : '';
+    }
+    Array.from(document.querySelectorAll('.rank-box')).forEach(function(box){
+      const k = box.dataset.rk;
+      Array.from(box.querySelectorAll('.rank-chip')).forEach(function(c){
+        c.addEventListener('click', function(){
+          const sel = rankAnswers[k], pos = sel.indexOf(c.dataset.attr);
+          if(pos >= 0){ sel.splice(pos, 1); }          // 取り消し（後ろの順位は繰り上がる）
+          else if(sel.length < RANK_MAX){ sel.push(c.dataset.attr); }
+          renderRank(k); update();
+        });
+      });
+      renderRank(k);
+    });
     function update(){
       ['SQ'].forEach(function(k){
         const el = document.querySelector('input[name="fam_' + k + '"]:checked');
@@ -690,7 +731,7 @@
         const el = document.querySelector('input[name="sat_' + k + '"]:checked');
         satAnswers[k] = el ? Number(el.value) : null;
       });
-      btn.disabled = !(famAnswers.SQ && satAnswers.r1 && satAnswers.r2);
+      btn.disabled = !(famAnswers.SQ && satAnswers.r1 && satAnswers.r2 && rankAnswers.r1.length >= 1 && rankAnswers.r2.length >= 1);
     }
     Array.from(document.querySelectorAll('.fam-scale input')).forEach(function(inp){ inp.addEventListener('change', update); });
     btn.addEventListener('click', function(){ update(); if(!btn.disabled) submitResults(); });
@@ -721,6 +762,10 @@
       slides: records,
       familiarity: { SQ: famAnswers.SQ, order: famAnswers._order },
       satisfaction: { round1: satAnswers.r1, round2: satAnswers.r2 },   // 7段階（高いほど満足）
+      priority: {   // 選ぶとき重視した点（タップ順＝1位,2位,3位。項目名）
+        round1: rankAnswers.r1.map(labelOf), round2: rankAnswers.r2.map(labelOf),
+        round1Keys: rankAnswers.r1.slice(), round2Keys: rankAnswers.r2.slice()
+      },
       recallViews: { round1: recallViews.round1, round2: recallViews.round2 }   // 「選んだ財を確認する」を開いた回数
     };
     try{ sessionStorage.setItem('experiment_pendingCO_' + good, JSON.stringify(payload)); }catch(e){}
