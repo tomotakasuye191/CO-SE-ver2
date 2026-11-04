@@ -207,6 +207,14 @@
 
     <form id="entryForm">
       <div class="field" style="margin-top:0;">
+        <label class="q">どちらの実験を行いますか？（それぞれ2種類の商品について行います）</label>
+        <div class="radio-group" data-group="pair" id="pairGroup">
+          <div class="radio-pill" data-value="A">ヨーグルト と お米</div>
+          <div class="radio-pill" data-value="B">ワイン と チョコレート</div>
+        </div>
+      </div>
+
+      <div class="field">
         <label class="q">東京理科大学に所属していますか？</label>
         <div class="radio-group" data-group="affiliation" id="affiliationGroup">
           <div class="radio-pill" data-value="はい">はい</div>
@@ -294,6 +302,15 @@
   const fieldEmail = document.getElementById('field-email');
   let selectedGender = '';
   let selectedAffiliation = '';
+  let selectedPair = '';   // 'A' = ヨーグルト＋お米 / 'B' = ワイン＋チョコレート（最初の画面で本人が選ぶ）
+  const pairGroup = document.getElementById('pairGroup');
+  pairGroup.querySelectorAll('.radio-pill').forEach(function(pill){
+    pill.addEventListener('click', function(){
+      pairGroup.querySelectorAll('.radio-pill').forEach(function(p){ p.classList.remove('selected'); });
+      pill.classList.add('selected');
+      selectedPair = pill.dataset.value;
+    });
+  });
 
   genderGroup.querySelectorAll('.radio-pill').forEach(function(pill){
     pill.addEventListener('click', function(){
@@ -330,6 +347,10 @@
   form.addEventListener('submit', function(e){
     e.preventDefault();
 
+    if(!selectedPair){
+      showMessage('どちらの実験を行うかを選択してください。', 'error');
+      return;
+    }
     if(!selectedAffiliation){
       showMessage('東京理科大学への所属の有無を選択してください。', 'error');
       return;
@@ -367,7 +388,7 @@
       method: 'POST',
       // text/plain にすることでプリフライトを回避し、GAS側のCORS制約を避ける
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'register', id: id, gender: gender, age: age, affiliation: affiliation, idType: idType })
+      body: JSON.stringify({ action: 'register', id: id, gender: gender, age: age, affiliation: affiliation, idType: idType, pair: selectedPair })
     }).then(function(res){ return res.json(); })
       .then(function(data){
         if(data.status !== 'ok'){
