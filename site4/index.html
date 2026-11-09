@@ -247,6 +247,11 @@
   .fam-scale label{ display:flex; flex-direction:column; align-items:center; font-size:11px; color:#4b554e; cursor:pointer; min-width:44px; }
   .fam-scale input{ margin:4px 0 2px; }
   .fam-ends{ display:flex; justify-content:space-between; font-size:10.5px; color:#7a8279; margin-top:4px; }
+  .sat-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:9px 0; border-top:1px solid #eef0ec; }
+  .sat-lab{ flex:0 0 118px; font-size:12.5px; font-weight:700; color:#2f3a34; }
+  .sat-row .fam-scale label{ min-width:40px; }
+  .sat-row.off .sat-lab{ color:#9aa39d; font-weight:400; }
+  .sat-na{ font-size:12px; color:#9aa39d; }
   .rank-box{ margin-top:14px; padding-top:12px; border-top:1px dashed var(--line); }
   .rank-q{ font-size:12.5px; font-weight:700; color:#2f3a34; line-height:1.55; }
   .rank-sub{ font-size:11px; color:#7a8279; margin:2px 0 8px; }
@@ -612,7 +617,7 @@
   // 親近感（馴染み）の質問：基準財について、5段階
   // ============================================================
   const famAnswers = {};
-  const satAnswers = {};
+  const satAnswers = { r1: {}, r2: {} };   // 満足度：回ごと・候補の数(5/10/15/20)ごと（7段階）
   const rankAnswers = { r1: [], r2: [] };   // 選ぶとき重視した点（属性キー。タップした順＝重視順、最大3つ）
   const RANK_MAX = 3;
 
@@ -669,12 +674,24 @@
     let html = '<div class="fam-screen">' +
       '<h1 class="fam-title">最後に、商品についてお伺いします</h1>' +
       '<h2 style="font-size:1.05rem;margin:18px 0 6px;">1. 選んだ商品への満足度</h2>' +
-      '<p class="fam-desc">実験全体を振り返って、' + goodLabel + 'を選んだ結果にどのくらい満足していますか。1回目・2回目それぞれについてお答えください。</p>' +
+      '<p class="fam-desc">候補の数（' + SIZES.slice().sort(function(a, b){ return a - b; }).join('・') + '個）ごとに、そのとき選んだ' + goodLabel + 'にどのくらい満足していますか。1回目・2回目それぞれについてお答えください。</p>' +
       [ {k:'r1', t:'1回目の実験で選んだ商品への満足度'}, {k:'r2', t:'2回目の実験で選んだ商品への満足度'} ].map(function(q){
         let h = '<div class="fam-card"><div class="fam-body"><div class="fam-head"><div class="fam-name">' + q.t + '</div>' +
-          '<button type="button" class="recall-btn" data-round="' + (q.k === 'r1' ? 1 : 2) + '">選んだ財を確認する</button></div><div class="fam-scale">';
-        for(let n = 1; n <= 7; n++){ h += '<label><input type="radio" name="sat_' + q.k + '" value="' + n + '"><span>' + n + '</span></label>'; }
-        h += '</div><div class="fam-ends"><span>1：まったく満足していない</span><span>7：とても満足している</span></div>';
+          '<button type="button" class="recall-btn" data-round="' + (q.k === 'r1' ? 1 : 2) + '">選んだ財を確認する</button></div>' +
+          '<div class="fam-ends" style="margin:0 0 4px;"><span>1：まったく満足していない</span><span>7：とても満足している</span></div>';
+        SIZES.slice().sort(function(a, b){ return a - b; }).forEach(function(size){
+          const rec = choiceLog.filter(function(x){ return x.round === (q.k === 'r1' ? 1 : 2) && x.size === size; })[0];
+          const na = !!(rec && rec.timedOut);   // 時間切れで選べなかった候補数は満足度を聞かない
+          h += '<div class="sat-row' + (na ? ' off' : '') + '" data-r="' + q.k + '" data-size="' + size + '"><div class="sat-lab">候補' + size + '個のとき</div>';
+          if(na){ h += '<div class="sat-na">時間切れのため回答不要</div>'; }
+          else {
+            h += '<div class="fam-scale">';
+            for(let n = 1; n <= 7; n++){ h += '<label><input type="radio" name="sat_' + q.k + '_' + size + '" value="' + n + '"><span>' + n + '</span></label>'; }
+            h += '</div>';
+          }
+          h += '</div>';
+        });
+        h += '<div style="height:2px;"></div>';
         h += '<div class="rank-box" data-rk="' + q.k + '"><div class="rank-q">この商品を選ぶとき、何を重視しましたか。</div>' +
              '<div class="rank-sub">重視した項目を、重視した順に最大' + RANK_MAX + 'つまでタップしてください（もう一度タップすると取り消せます）。</div><div class="rank-chips">';
         DEF.attrs.forEach(function(a){
@@ -727,11 +744,17 @@
         const el = document.querySelector('input[name="fam_' + k + '"]:checked');
         famAnswers[k] = el ? Number(el.value) : null;
       });
+      let satOk = true;
       ['r1','r2'].forEach(function(k){
-        const el = document.querySelector('input[name="sat_' + k + '"]:checked');
-        satAnswers[k] = el ? Number(el.value) : null;
+        SIZES.forEach(function(size){
+          const row = document.querySelector('.sat-row[data-r="' + k + '"][data-size="' + size + '"]');
+          if(!row || row.classList.contains('off')){ satAnswers[k][size] = null; return; }   // 時間切れは回答なし
+          const el = document.querySelector('input[name="sat_' + k + '_' + size + '"]:checked');
+          satAnswers[k][size] = el ? Number(el.value) : null;
+          if(satAnswers[k][size] == null) satOk = false;
+        });
       });
-      btn.disabled = !(famAnswers.SQ && satAnswers.r1 && satAnswers.r2 && rankAnswers.r1.length >= 1 && rankAnswers.r2.length >= 1);
+      btn.disabled = !(famAnswers.SQ && satOk && rankAnswers.r1.length >= 1 && rankAnswers.r2.length >= 1);
     }
     Array.from(document.querySelectorAll('.fam-scale input')).forEach(function(inp){ inp.addEventListener('change', update); });
     btn.addEventListener('click', function(){ update(); if(!btn.disabled) submitResults(); });
@@ -761,7 +784,7 @@
       reserveIds: setup.reserve.map(function(p){ return String(p.id); }),
       slides: records,
       familiarity: { SQ: famAnswers.SQ, order: famAnswers._order },
-      satisfaction: { round1: satAnswers.r1, round2: satAnswers.r2 },   // 7段階（高いほど満足）
+      satisfaction: { round1: satAnswers.r1, round2: satAnswers.r2 },   // 7段階（高いほど満足）。{ 候補の数(5/10/15/20): 点数 }（時間切れの候補数は null）
       priority: {   // 選ぶとき重視した点（タップ順＝1位,2位,3位。項目名）
         round1: rankAnswers.r1.map(labelOf), round2: rankAnswers.r2.map(labelOf),
         round1Keys: rankAnswers.r1.slice(), round2Keys: rankAnswers.r2.slice()
