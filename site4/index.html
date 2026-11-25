@@ -318,7 +318,15 @@
   // 未設定のときは従来の固定秒数 CO_TIME_LIMIT_SEC を使う。どちらも 0 なら制限なし(ver2)。
   const TIME_PER_ITEM_SEC = Number(CFG.CO_TIME_PER_ITEM_SEC) || 0;
   const TIME_FIXED_SEC = Number(CFG.CO_TIME_LIMIT_SEC) || 0;
-  function limitSecFor(n){ return TIME_PER_ITEM_SEC > 0 ? n * TIME_PER_ITEM_SEC : TIME_FIXED_SEC; }
+  // 枚数ごとの秒数の指定（CO_TIME_BY_SIZE_SEC = {5:15, 10:20, 15:30, 20:40} のような形）。あれば最優先。
+  const TIME_BY_SIZE = (CFG.CO_TIME_BY_SIZE_SEC && typeof CFG.CO_TIME_BY_SIZE_SEC === 'object') ? CFG.CO_TIME_BY_SIZE_SEC : null;
+  function limitSecFor(n){
+    if(TIME_BY_SIZE && Number(TIME_BY_SIZE[n]) > 0) return Number(TIME_BY_SIZE[n]);
+    return TIME_PER_ITEM_SEC > 0 ? n * TIME_PER_ITEM_SEC : TIME_FIXED_SEC;
+  }
+  // 基準財の確認ページ（ver3）：CO1・CO2の前に、左端に出る「今回の基準の商品」を確認するページを挟む。制限時間はこのページでは動かない。
+  const BASE_CONFIRM = !!CFG.CO_BASE_CONFIRM;
+  const baseConfirmMs = { round1: null, round2: null };
   const TIME_LIMIT_SEC = TIME_PER_ITEM_SEC > 0 ? TIME_PER_ITEM_SEC : TIME_FIXED_SEC;   // 記録用（GASへ送る設定値）
 
   const GOOD_LABELS = { yogurt:'ヨーグルト', rice:'お米', wine:'ワイン', chocolate:'チョコレート' };
@@ -503,7 +511,30 @@
     }
   }
 
+  // 基準財の確認ページ：このあとの画面で左端に出る基準の商品を、制限時間なしで確認してもらう。ボタンを押すと実験画面へ進む。
+  function renderBaseConfirm(round, next){
+    const t0 = Date.now();
+    const intro = (round === 2)
+      ? '<h1>ここまでで1回目の実験が終わりました</h1><p>ここからは条件を変えて、2回目の実験に入ります。<br>始める前に、2回目も基準となる商品をご確認ください。</p>'
+      : '<h1>実験の前に、基準の商品をご確認ください</h1><p>次の画面から、' + goodLabel + 'を比較して選んでいただきます。</p>';
+    app.innerHTML =
+      '<div class="transition-screen" style="max-width:520px;">' +
+        intro +
+        '<p style="margin-bottom:14px;"><b>これが「今回の基準の商品」です。</b>この後の画面では、この商品が画面の一番左に表示されます。<br>内容をよく見て覚えてから、下のボタンを押してください。<br>（この画面には時間制限はありません。ボタンを押すと、すぐに実験の画面に進みます）</p>' +
+        '<div id="baseConfirmCard" style="display:flex;justify-content:center;text-align:left;margin:0 auto 22px;"></div>' +
+        '<button id="baseConfirmBtn">確認しました（実験を始める）</button>' +
+      '</div>';
+    const bc = buildCard(SQ, { isBase:true, overrides:sqOverrides });
+    bc.style.width = '240px'; bc.style.cursor = 'default';
+    document.getElementById('baseConfirmCard').appendChild(bc);
+    document.getElementById('baseConfirmBtn').addEventListener('click', function(){
+      baseConfirmMs['round' + round] = Date.now() - t0;
+      next();
+    });
+  }
+
   function renderRoundTransition(){
+    if(BASE_CONFIRM){ renderBaseConfirm(2, nextSlide); return; }
     app.innerHTML =
       '<div class="transition-screen">' +
         '<h1>ここまでで1回目の実験が終わりました</h1>' +
@@ -586,7 +617,12 @@
         aprimeExpected: round === 2 ? window.CODesign.APRIME_COUNT[size] : 0,
         aprimeShort: (round === 2 && items.filter(function(x){ return x.isAprime; }).length < window.CODesign.APRIME_COUNT[size]) ? 1 : 0,
         aprimeIds: items.filter(function(x){ return x.isAprime; }).map(function(x){ return String(x.p.id); }),
-        aprimeFallbackIds: items.filter(function(x){ return x.isAprime && x.apOk === false; }).map(function(x){ return String(x.p.id); })
+        aprimeFallbackIds: items.filter(function(x){ return x.isAprime && x.apOk === false; }).map(function(x){ return String(x.p.id); }),
+        aprimeModified: items.filter(function(x){ return x.isAprime && x.apMods; }).map(function(x){
+          return String(x.p.id) + ':' + Object.keys(x.apMods).map(function(a){
+            return (DEF.attrLabels[a] || a) + '=' + ((DEF.dispLabels && DEF.dispLabels[a]) || DEF.labels[a])[x.apMods[a]];
+          }).join('+');
+        })
       });
       choiceLog.push({ round: round, size: size, timedOut: !!timedOut, kept: kept,
         product: timedOut ? null : (kept ? SQ : (chosen ? chosen.p : null)),
@@ -768,7 +804,7 @@
   function submitResults(){
     const payload = {
       action: 'submitCO', schema: 2, id: id, good: good,
-      levelVersion: window.CONJOINT_VERSION, timeLimitSec: (TIME_PER_ITEM_SEC > 0 ? TIME_PER_ITEM_SEC + '秒×提示枚数' : TIME_FIXED_SEC),
+      levelVersion: window.CONJOINT_VERSION, timeLimitSec: (TIME_BY_SIZE ? Object.keys(TIME_BY_SIZE).sort(function(a,b){return a-b;}).map(function(k){return TIME_BY_SIZE[k];}).join('/') + '秒（' + Object.keys(TIME_BY_SIZE).sort(function(a,b){return a-b;}).join('/') + '枚）' : (TIME_PER_ITEM_SEC > 0 ? TIME_PER_ITEM_SEC + '秒×提示枚数' : TIME_FIXED_SEC)),
       top2: setup.top2, top2Labels: setup.top2.map(labelOf),
       poolSize: pool.length,
       A: { id: String(A0.id), name: A0.name, round: A0.round, norm: setup.ev.byId[String(A0.id)].norm, u: setup.ev.byId[String(A0.id)].u },   // プール内の最適財(1位)
@@ -789,7 +825,8 @@
         round1: rankAnswers.r1.map(labelOf), round2: rankAnswers.r2.map(labelOf),
         round1Keys: rankAnswers.r1.slice(), round2Keys: rankAnswers.r2.slice()
       },
-      recallViews: { round1: recallViews.round1, round2: recallViews.round2 }   // 「選んだ財を確認する」を開いた回数
+      recallViews: { round1: recallViews.round1, round2: recallViews.round2 },   // 「選んだ財を確認する」を開いた回数
+      baseConfirmMs: { round1: baseConfirmMs.round1, round2: baseConfirmMs.round2 }   // 基準財の確認ページに滞在した時間(ms)。ページなしのときは null
     };
     try{ sessionStorage.setItem('experiment_pendingCO_' + good, JSON.stringify(payload)); }catch(e){}
     sendCOPayload(payload);
@@ -840,7 +877,7 @@
   // ---- 開始 ----
   function startExperiment(){
     remaining1 = window.CODesign.shuffle(SIZES);
-    nextSlide();
+    if(BASE_CONFIRM){ renderBaseConfirm(1, nextSlide); } else { nextSlide(); }
   }
 
   // 直前のセッションで送信に失敗した回答が残っていれば、まずそれを再送信する
