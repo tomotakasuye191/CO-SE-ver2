@@ -238,23 +238,50 @@
   }
 
   // A'：候補プールから n 個選ぶ。top2 の表示値をAと同じにして、効用がA未満かつSQ超になるものを優先
+  //   本物の商品だけで足りないときは、候補の「変更を許可された属性(def.modifiable)」を1つだけ別の水準に変えた版を使う
+  //   （変更した内容は mods に入れて記録する。本物のまま条件を満たす商品を先に使い、変更版はその次）
   function makeAprime(def, lu, A, SQ, sqU, top2, candidates, n, rng) {
     var uA = E.productUtility(def, lu, A.v);
+    var constA = def.attrs.filter(function (a) {
+      var seen = {}; candidates.concat([A]).forEach(function (p) { seen[E.classOf(def, a, p.v[a])] = 1; });
+      return Object.keys(seen).length <= 1;
+    });
+    var modAttrs = (def.modifiable || []).filter(function (a) { return top2.indexOf(a) === -1 && constA.indexOf(a) === -1; });
     var rows = candidates.filter(function (p) { return p.id !== A.id && p.id !== SQ.id; }).map(function (p) {
       var v2 = {}; Object.keys(p.v).forEach(function (k) { v2[k] = p.v[k]; });
       top2.forEach(function (a) { v2[a] = A.v[a]; });
       var u2 = E.productUtility(def, lu, v2);
-      return { p: p, u: u2, ok: (u2 < uA - EPS && u2 > sqU + EPS), underA: (u2 < uA - EPS) };
+      var row = { p: p, u: u2, ok: (u2 < uA - EPS && u2 > sqU + EPS), underA: (u2 < uA - EPS), mods: null };
+      if (!row.ok && modAttrs.length) {   // 変更版：条件に入るものの中で、効用がAに最も近いもの
+        var bestv = null;
+        modAttrs.forEach(function (a) {
+          var cur = E.classOf(def, a, v2[a]);
+          for (var l = 0; l < def.nlev[a]; l++) {
+            if (l === cur) continue;
+            var v3 = {}; Object.keys(v2).forEach(function (k) { v3[k] = v2[k]; });
+            v3[a] = l;
+            var u3 = E.productUtility(def, lu, v3);
+            if (u3 < uA - EPS && u3 > sqU + EPS && (bestv === null || u3 > bestv.u)) { var m = {}; m[a] = l; bestv = { u: u3, mods: m }; }
+          }
+        });
+        if (bestv) { row.u = bestv.u; row.ok = true; row.underA = true; row.mods = bestv.mods; }
+      }
+      return row;
     });
-    var good = shuffle(rows.filter(function (x) { return x.ok; }), rng);
-    var pick = good.slice(0, n);
-    if (pick.length < n) { // 不足分：Aを超えない中でSQに近い(効用が高い)ものから補う
+    var okPlain = shuffle(rows.filter(function (x) { return x.ok && !x.mods; }), rng);
+    var okMod = shuffle(rows.filter(function (x) { return x.ok && x.mods; }), rng);
+    var pick = okPlain.concat(okMod).slice(0, n);
+    if (pick.length < n) { // 不足分：Aを超えない中でSQに近い(効用が高い)ものから補う（変更なしの商品）
       var more = rows.filter(function (x) { return !x.ok && x.underA; }).sort(function (a, b) { return b.u - a.u; });
       pick = pick.concat(more.slice(0, n - pick.length));
     }
     var disp = {};
     top2.forEach(function (a) { var k = def.toSite4[a]; if (k) disp[k] = A.attrs[k]; });
-    return pick.map(function (x) { return { id: x.p.id, overrides: disp, u: x.u, ok: x.ok }; });
+    return pick.map(function (x) {
+      var ov = {}; Object.keys(disp).forEach(function (k) { ov[k] = disp[k]; });
+      if (x.mods) { var mo = modsToOverrides(def, x.mods); Object.keys(mo).forEach(function (k) { ov[k] = mo[k]; }); }
+      return { id: x.p.id, overrides: ov, u: x.u, ok: x.ok, mods: x.mods };
+    });
   }
 
   // 被験者ごとの初期セットアップ（A0, 各スライドのA, top2, SQ, 予備財）
@@ -327,7 +354,7 @@
     var items = shuffle(chosen.concat(fill).map(function (p) {
       var ap = aprime.filter(function (x) { return String(x.id) === String(p.id); })[0];
       // u：画面に出る商品の推定効用（A'は表示値をAに揃えた後の効用）
-      return { p: p, overrides: ap ? ap.overrides : null, isAprime: !!ap, apOk: ap ? ap.ok : null,
+      return { p: p, overrides: ap ? ap.overrides : null, isAprime: !!ap, apOk: ap ? ap.ok : null, apMods: ap ? ap.mods : null,
                u: ap ? ap.u : st.ev.byId[String(p.id)].u };
     }).concat([{ p: A, overrides: null, isAprime: false, isA: true, u: ak.u }]), rng);
     return { items: items, aprime: aprime, A: A, aInfo: ak, borrowedIds: borrowed.map(function (p) { return String(p.id); }) };
